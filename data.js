@@ -48,29 +48,36 @@
     "#B5EAD7", "#A0E7E5", "#C7CEEA", "#D5AAFF", "#F8B4D9",
   ];
 
-  // 4단계 색상 매칭 미션용 (대비가 분명한 안내용 색상)
+  // 4단계 색상 매칭 놀이용 (무지개 6색).
+  // 남색은 파란색과 유사해 같은 화면에 함께 등장 시 혼동을 줄 수 있어 제외.
   const MISSION_COLORS = {
-    "#FF5A6A": "빨간색",
-    "#FFD23F": "노란색",
-    "#5BCB74": "초록색",
-    "#4D96FF": "파란색",
-    "#B86BFF": "보라색",
-    "#FF8A3D": "주황색",
+    "#E53935": "빨간색",
+    "#FB8C00": "주황색",
+    "#FDD835": "노란색",
+    "#43A047": "초록색",
+    "#1E88E5": "파란색",
+    "#8E24AA": "보라색",
   };
 
-  // 6·7·8단계: 색 이름과 함께 매핑된 큐레이션 팔레트
-  const NAMED_COLORS = [
-    ["#FF5A6A", "빨간색"],
-    ["#FF8A3D", "주황색"],
-    ["#FFD23F", "노란색"],
-    ["#BEEAB6", "연두색"],
-    ["#3FBA5E", "초록색"],
-    ["#4D96FF", "파란색"],
-    ["#5DD3D5", "하늘색"],
-    ["#B86BFF", "보라색"],
-    ["#FF8FCF", "분홍색"],
-    ["#A07555", "갈색"],
+  // 6·7·8단계: 어린이용 무지개 7원색 + 보조 3색.
+  // 우선적으로 PRIMARY(빨주노초파남보) 에서 채우고, 더 필요한 단계에 한해
+  // SUPPLEMENTARY(분홍·갈색·청록) 를 추가 투입한다 (pickPrioritizedColors 참조).
+  const NAMED_PRIMARY = [
+    ["#E53935", "빨간색"],
+    ["#FB8C00", "주황색"],
+    ["#FDD835", "노란색"],
+    ["#43A047", "초록색"],
+    ["#1E88E5", "파란색"],   // 약간 짙은 하늘색
+    ["#0D47A1", "남색"],     // 매우 진한 파란색
+    ["#8E24AA", "보라색"],
   ];
+  const NAMED_SUPPLEMENTARY = [
+    ["#EC407A", "분홍색"],
+    ["#6D4C41", "갈색"],
+    ["#00897B", "청록색"],
+  ];
+  // 통합 풀이 필요한 곳을 위해 호환용으로도 노출 (현재 코드에서는 거의 미사용)
+  const NAMED_COLORS = NAMED_PRIMARY.concat(NAMED_SUPPLEMENTARY);
 
   // 6단계 방향: [한글 이름, row 변화량, col 변화량]
   const DIRECTIONS = [
@@ -104,6 +111,16 @@
     }
     const shuffled = shuffle(hues);
     return shuffled.map((h) => "hsl(" + h + ", " + saturation + "%, " + lightness + "%)");
+  }
+
+  // 무지개 7원색을 우선 채우고, 부족한 만큼만 보조 색상에서 추가로 뽑는다.
+  // 반환값은 [hex, name] tuple 배열 (랜덤 순서). N 이 7 이하면 무지개에서만 추출.
+  function pickPrioritizedColors(n) {
+    const primary = shuffle(NAMED_PRIMARY);
+    if (n <= primary.length) return primary.slice(0, n);
+    const need = n - primary.length;
+    const sup = shuffle(NAMED_SUPPLEMENTARY).slice(0, need);
+    return primary.concat(sup);
   }
 
   // ─────────────────────────────────────────────────────────────
@@ -206,8 +223,8 @@
     const cols = 3, rows = 3;
     const count = cols * rows;
 
-    const pool = shuffle(NAMED_COLORS);
-    const chosen = shuffle(pool.slice(0, count));
+    // 9칸 → 무지개 7색 + 보조 2색을 priority 헬퍼로 자동 구성, 위치는 무작위
+    const chosen = shuffle(pickPrioritizedColors(count));
 
     const colors = chosen.map((p) => p[0]);
     const color_names = chosen.map((p) => p[1]);
@@ -253,7 +270,8 @@
     const n = randint(1, total - 1);
     const m = total - n;
 
-    const pool = shuffle(NAMED_COLORS);
+    // 정답 2색 + 디스트랙터 풀 3색 = 총 5색만 필요 → 모두 무지개에서 추출
+    const pool = pickPrioritizedColors(5);
     const target_a = pool[0];
     const target_b = pool[1];
     const distractor_pool = pool.slice(2, 5);
@@ -290,9 +308,8 @@
     const pairs_count = 6;
     const count = pairs_count * 2;
 
-    const allHexes = NAMED_COLORS.map((p) => p[0]);
-    const pool = shuffle(allHexes);
-    const chosen = pool.slice(0, pairs_count);
+    // 6쌍 → 모두 무지개 원색에서 추출 (7원색 중 6개를 임의 선택)
+    const chosen = pickPrioritizedColors(pairs_count).map((p) => p[0]);
     const marbles = shuffle(chosen.concat(chosen));
 
     return {

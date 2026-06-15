@@ -39,14 +39,8 @@
   }
 
   // ─────────────────────────────────────────────────────────────
-  //  상수 (data.py 와 동일)
+  //  상수 (data.py 와 동일 + 무지개 원색 톤으로 통일)
   // ─────────────────────────────────────────────────────────────
-
-  // 1·5단계: 부드러운 파스텔 (배경과 잘 어울리는 톤)
-  const PASTEL_PALETTE = [
-    "#FF9AA2", "#FFB7B2", "#FFDAC1", "#FFE49C", "#E2F0CB",
-    "#B5EAD7", "#A0E7E5", "#C7CEEA", "#D5AAFF", "#F8B4D9",
-  ];
 
   // 4단계 색상 매칭 놀이용 (무지개 6색).
   // 남색은 파란색과 유사해 같은 화면에 함께 등장 시 혼동을 줄 수 있어 제외.
@@ -59,9 +53,10 @@
     "#8E24AA": "보라색",
   };
 
-  // 6·7·8단계: 어린이용 무지개 7원색 + 보조 3색.
-  // 우선적으로 PRIMARY(빨주노초파남보) 에서 채우고, 더 필요한 단계에 한해
-  // SUPPLEMENTARY(분홍·갈색·청록) 를 추가 투입한다 (pickPrioritizedColors 참조).
+  // 모든 색을 띄우는 단계의 기본 풀:
+  //   PRIMARY = 빨·주·노·초·파·남·보 무지개 7원색 (우선 사용)
+  //   SUPPLEMENTARY = 분홍·갈색·에메랄드 (7개 초과로 색이 더 필요할 때만 투입)
+  // pickPrioritizedColors(n) 가 N 에 따라 자동 조립한다.
   const NAMED_PRIMARY = [
     ["#E53935", "빨간색"],
     ["#FB8C00", "주황색"],
@@ -72,12 +67,14 @@
     ["#8E24AA", "보라색"],
   ];
   const NAMED_SUPPLEMENTARY = [
-    ["#EC407A", "분홍색"],
+    ["#FFCAD4", "분홍색"],
     ["#6D4C41", "갈색"],
-    ["#00897B", "청록색"],
+    ["#00B894", "에메랄드색"],
   ];
-  // 통합 풀이 필요한 곳을 위해 호환용으로도 노출 (현재 코드에서는 거의 미사용)
+  // 통합 풀이 필요한 곳을 위해 호환용으로도 노출
   const NAMED_COLORS = NAMED_PRIMARY.concat(NAMED_SUPPLEMENTARY);
+  // 무지개 7원색의 hex 만 모은 편의 배열 (1·5·10단계가 사용)
+  const RAINBOW_HEXES = NAMED_PRIMARY.map((p) => p[0]);
 
   // 6단계 방향: [한글 이름, row 변화량, col 변화량]
   const DIRECTIONS = [
@@ -94,27 +91,9 @@
   ];
 
   // ─────────────────────────────────────────────────────────────
-  //  HSL 색상환 균등 분할 → N 개 고유 색상
+  //  무지개 7원색을 우선 채우고, 부족한 만큼만 보조 색상에서 추가로 뽑는다.
+  //  반환값은 [hex, name] tuple 배열 (랜덤 순서). N 이 7 이하면 무지개에서만 추출.
   // ─────────────────────────────────────────────────────────────
-  function generateDistinctColors(n, saturation, lightness, hueJitter) {
-    if (saturation === undefined) saturation = 72;
-    if (lightness  === undefined) lightness  = 68;
-    if (hueJitter  === undefined) hueJitter  = 6;
-
-    const baseOffset = uniform(0, 360);
-    const step = 360.0 / n;
-    const hues = [];
-    for (let i = 0; i < n; i++) {
-      let h = (baseOffset + i * step + uniform(-hueJitter, hueJitter)) % 360;
-      if (h < 0) h += 360;
-      hues.push(Math.floor(h));
-    }
-    const shuffled = shuffle(hues);
-    return shuffled.map((h) => "hsl(" + h + ", " + saturation + "%, " + lightness + "%)");
-  }
-
-  // 무지개 7원색을 우선 채우고, 부족한 만큼만 보조 색상에서 추가로 뽑는다.
-  // 반환값은 [hex, name] tuple 배열 (랜덤 순서). N 이 7 이하면 무지개에서만 추출.
   function pickPrioritizedColors(n) {
     const primary = shuffle(NAMED_PRIMARY);
     if (n <= primary.length) return primary.slice(0, n);
@@ -130,8 +109,10 @@
   function generateStage1() {
     const count = 12;
     const big_index = randrange(count);
+    // 12개 → 무지개 7원색에서 무작위 추출 (중복 허용). 색은 장식이고
+    // 정답은 크기로만 식별하므로 색 중복은 게임에 영향 없음.
     const colors = [];
-    for (let i = 0; i < count; i++) colors.push(choice(PASTEL_PALETTE));
+    for (let i = 0; i < count; i++) colors.push(choice(RAINBOW_HEXES));
     return {
       id: 1,
       title: "어떤 구슬이 가장 클까?",
@@ -190,7 +171,8 @@
   function generateStage4() {
     const count = 9;
     const numbers = shuffle(range(count).map((i) => i + 1));
-    const colors = generateDistinctColors(count);
+    // 9칸 → 무지개 7 + 보조 2 (priority), 위치는 무작위
+    const colors = shuffle(pickPrioritizedColors(count)).map((p) => p[0]);
     return {
       id: 4,
       title: "차례차례 숫자 세기",
@@ -205,7 +187,8 @@
   function generateStage5() {
     const count = 12;
     const different_indices = sample(range(count), 2).slice().sort((a, b) => a - b);
-    const base_color = choice(PASTEL_PALETTE);
+    // 베이스 색은 무지개 1색 무작위
+    const base_color = choice(RAINBOW_HEXES);
     const pattern = choice(["pattern-stripe", "pattern-star"]);
     return {
       id: 5,
@@ -327,7 +310,8 @@
   function generateStage9Simon() {
     const count = 9;
     const sequence_len = 4;
-    const colors = generateDistinctColors(count);
+    // 9칸 → 무지개 7 + 보조 2 (priority), 위치는 무작위
+    const colors = shuffle(pickPrioritizedColors(count)).map((p) => p[0]);
     const sequence = sample(range(count), sequence_len);
     return {
       id: 9,
@@ -343,9 +327,11 @@
   }
 
   function generateStage10() {
-    const count = HANGUL_ORDER.length;
+    const count = HANGUL_ORDER.length; // 14
     const chars = shuffle(HANGUL_ORDER);
-    const colors = generateDistinctColors(count);
+    // 무지개 7원색을 각각 2번씩 = 14개를 무작위 위치에 배치.
+    // 한글은 글자로 식별되므로 같은 색이 두 번 등장해도 게임에 무관.
+    const colors = shuffle(RAINBOW_HEXES.concat(RAINBOW_HEXES));
     return {
       id: 10,
       title: "한글 기차 출발!",
@@ -373,8 +359,6 @@
         generateStage8Memory(),   // 9단계: 짝 찾기 (작업 기억)
         generateStage10(),        // 10단계: 한글 기차 (마지막)
       ],
-      palette: PASTEL_PALETTE,
-      mission_colors: MISSION_COLORS,
     };
   }
 

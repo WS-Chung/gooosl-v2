@@ -1,0 +1,673 @@
+:root {
+    --bg-1: #ffe1ec;
+    --bg-2: #e2ecff;
+    --bg-3: #fff4d4;
+    --ink: #3b2c4a;
+    --ink-soft: #6b5a7a;
+    --accent: #ff7aa2;
+    --accent-2: #7ac6ff;
+    --accent-3: #ffd166;
+    --card-bg: rgba(255,255,255,0.62);
+    --card-stroke: rgba(255,255,255,0.85);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
+
+  body {
+    font-family: 'Jua', 'Gaegu', 'Noto Sans KR', system-ui, sans-serif;
+    color: var(--ink);
+    background:
+      radial-gradient(at 20% 10%, var(--bg-1) 0%, transparent 55%),
+      radial-gradient(at 80% 0%, var(--bg-2) 0%, transparent 55%),
+      radial-gradient(at 50% 100%, var(--bg-3) 0%, transparent 55%),
+      linear-gradient(135deg, #fff7fb 0%, #f3f7ff 100%);
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+
+  /* 떠다니는 배경 장식 (구름, 별) */
+  .bg-deco {
+    position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    overflow: hidden;
+  }
+  .bg-deco span {
+    position: absolute;
+    font-size: 28px;
+    opacity: .55;
+    animation: floaty 9s ease-in-out infinite;
+    filter: drop-shadow(0 4px 6px rgba(0,0,0,.05));
+  }
+  @keyframes floaty {
+    0%,100% { transform: translateY(0) rotate(0deg); }
+    50%    { transform: translateY(-14px) rotate(6deg); }
+  }
+
+  /* 메인 카드 */
+  .stage-wrap {
+    position: relative;
+    width: min(80vw, 1100px);
+    height: min(82vh, 820px);
+    margin: 2.5vh auto;
+    display: flex; flex-direction: column;
+    background: var(--card-bg);
+    backdrop-filter: blur(14px) saturate(120%);
+    -webkit-backdrop-filter: blur(14px) saturate(120%);
+    border: 2px solid var(--card-stroke);
+    border-radius: 28px;
+    box-shadow:
+      0 20px 50px rgba(118, 90, 160, .18),
+      inset 0 1px 0 rgba(255,255,255,.9);
+    padding: 18px 22px 22px;
+    z-index: 1;
+  }
+
+  /* 상단 바 */
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; flex-wrap: wrap;
+  }
+  .title {
+    font-size: clamp(20px, 2.6vw, 30px);
+    color: var(--accent);
+    text-shadow: 0 2px 0 #fff;
+    letter-spacing: .5px;
+  }
+  .title .heart {
+    display: inline-block;
+    margin: 0 2px;
+    animation: heartbeat 1.4s ease-in-out infinite;
+  }
+  @keyframes heartbeat {
+    0%,100% { transform: scale(1); }
+    30%     { transform: scale(1.18); }
+    60%     { transform: scale(0.95); }
+  }
+
+  /* 스테이지 타이틀 (게임 타이틀과 분리) */
+  .stage-title {
+    text-align: center;
+    margin: 12px auto 0;
+    font-size: clamp(20px, 2.4vw, 28px);
+    color: #6b3b56;
+    letter-spacing: .3px;
+  }
+  .stage-pill {
+    background: linear-gradient(135deg, #ffd0e2, #ffe7c0);
+    color: #6b3b56;
+    border-radius: 999px;
+    padding: 6px 14px;
+    font-size: clamp(13px, 1.4vw, 16px);
+    box-shadow: 0 4px 10px rgba(255, 158, 192, .35);
+  }
+  .progress-dots { display: flex; gap: 8px; }
+  .progress-dots .d {
+    width: 14px; height: 14px; border-radius: 50%;
+    background: #f1d6e3; transition: all .3s ease;
+    box-shadow: inset 0 -2px 0 rgba(0,0,0,.06);
+  }
+  .progress-dots .d.done { background: linear-gradient(135deg, #ff8fb1, #ffc36b); transform: scale(1.05); }
+  .progress-dots .d.now  { background: linear-gradient(135deg, #ffb3cf, #ffe1a8); transform: scale(1.2); box-shadow: 0 0 0 3px #fff; }
+
+  /* 인스트럭션 */
+  .instruction {
+    margin: 14px auto 8px;
+    text-align: center;
+    font-size: clamp(18px, 2.2vw, 26px);
+    color: var(--ink);
+    background: #fff;
+    border-radius: 18px;
+    padding: 10px 18px;
+    box-shadow: 0 6px 14px rgba(120, 90, 160, .12);
+    border: 2px solid #ffe2ee;
+  }
+  .instruction .accent { color: var(--accent); }
+  .instruction .next-tip {
+    display: inline-block; margin-left: 6px;
+    background: linear-gradient(135deg, #ffe7a8, #ffd0e2);
+    color: #6b3b56; padding: 2px 10px; border-radius: 999px;
+    font-size: .85em;
+  }
+
+  /* 구슬 그리드 */
+  .marble-area {
+    position: relative;
+    flex: 1;
+    margin-top: 10px;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+  }
+  .marble-grid {
+    display: grid;
+    gap: clamp(10px, 1.6vw, 22px);
+    width: 100%; height: 100%;
+    place-content: center;
+    place-items: center;
+    padding: 10px;
+  }
+
+  /* 구슬 공통 */
+  .marble {
+    --size: var(--marble-size, 80px);
+    --hue: #ffb7d3;
+    width: var(--size); height: var(--size);
+    border-radius: 50%;
+    background:
+      radial-gradient(circle at 32% 28%, rgba(255,255,255,.9) 0%, rgba(255,255,255,0) 28%),
+      radial-gradient(circle at 70% 80%, rgba(0,0,0,.10) 0%, rgba(0,0,0,0) 35%),
+      radial-gradient(circle at 50% 50%, var(--hue) 0%, color-mix(in srgb, var(--hue) 70%, #000 30%) 130%);
+    box-shadow:
+      0 10px 22px rgba(80, 40, 90, .18),
+      inset 0 -6px 14px rgba(0,0,0,.08),
+      inset 0 6px 14px rgba(255,255,255,.5);
+    cursor: pointer;
+    display: grid; place-items: center;
+    color: #fff;
+    font-size: calc(var(--size) * 0.34);
+    text-shadow: 0 2px 4px rgba(0,0,0,.25);
+    transition: transform .18s ease;
+    animation: bob 4s ease-in-out infinite;
+    position: relative;
+    will-change: transform, opacity;
+    border: none;
+    padding: 0;
+    font-family: inherit;
+    /* 모바일에서 드래그 시 페이지 스크롤·텍스트 선택·롱터치 메뉴 차단 */
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+  .marble:hover { transform: translateY(-4px) scale(1.04); }
+  .marble:active { transform: translateY(-1px) scale(0.97); }
+
+  @keyframes bob {
+    0%,100% { transform: translateY(0); }
+    50%    { transform: translateY(-3px); }
+  }
+
+  /* 1단계: 큰 구슬 */
+  .marble.big { --size: calc(var(--marble-size, 80px) * 1.2); }
+
+  /* 2단계: 불 켜진 / 꺼진 구슬 */
+  .marble.bulb-off {
+    --hue: #d6d6e0;
+    color: rgba(255,255,255,.4);
+  }
+  .marble.bulb-off::after {
+    content: ""; position: absolute; inset: 18% 30%;
+    background: rgba(255,255,255,.35); border-radius: 60% 60% 40% 40% / 70% 70% 30% 30%;
+    filter: blur(1px);
+  }
+  .marble.bulb-on {
+    --hue: #fff5a6;
+    box-shadow:
+      0 0 0 4px rgba(255, 230, 100, .35),
+      0 0 28px 6px rgba(255, 220, 90, .85),
+      0 10px 22px rgba(255, 180, 60, .35),
+      inset 0 -6px 14px rgba(255,160,30,.25),
+      inset 0 6px 14px rgba(255,255,255,.7);
+    animation: bob 4s ease-in-out infinite, twinkle 1.2s ease-in-out infinite alternate;
+  }
+  @keyframes twinkle {
+    from { filter: brightness(1); }
+    to   { filter: brightness(1.18) saturate(1.1); }
+  }
+  .marble.bulb-on::before {
+    content: "✨"; position: absolute; top: -10px; right: -8px; font-size: 18px;
+    text-shadow: 0 0 8px rgba(255,220,90,.9);
+  }
+
+  /* 5단계: 모양 다른 구슬 */
+  .marble.pattern-stripe::before {
+    content: ""; position: absolute; inset: 8%; border-radius: 50%;
+    background: repeating-linear-gradient(
+      45deg,
+      rgba(255,255,255,.0) 0 8px,
+      rgba(255,255,255,.32) 8px 12px
+    );
+    pointer-events: none;
+  }
+  .marble.pattern-star::before {
+    content: "★"; position: absolute;
+    color: rgba(255,255,255,.9);
+    font-size: 60%;
+    text-shadow: 0 1px 2px rgba(0,0,0,.2);
+    pointer-events: none;
+  }
+
+  /* 8단계 미리보기용 카운트다운 배지 (instruction 라인 안쪽에 떠오름) */
+  .instruction .countdown-badge {
+    display: inline-grid;
+    place-items: center;
+    width:  clamp(40px, 4.5vw, 56px);
+    height: clamp(40px, 4.5vw, 56px);
+    border-radius: 50%;
+    background: linear-gradient(135deg, #ff8fb1, #ffc36b);
+    color: white;
+    font-family: 'Jua', 'Gaegu', sans-serif;
+    font-size: clamp(22px, 2.8vw, 32px);
+    text-shadow: 0 2px 4px rgba(0,0,0,.25);
+    box-shadow: 0 6px 14px rgba(255, 130, 170, .4);
+    margin-left: 14px;
+    vertical-align: middle;
+    line-height: 1;
+  }
+  .instruction .countdown-badge.beat {
+    animation: countdown-beat .6s cubic-bezier(.36, 1.6, .5, 1);
+  }
+  @keyframes countdown-beat {
+    0%   { transform: scale(0.4); opacity: 0.3; }
+    40%  { transform: scale(1.3); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
+  /* 8단계: 짝 찾기 - 뒤집힌 상태 (face-down) */
+  .marble.face-down {
+    /* 모든 카드는 동일한 흰색 마블로 보이고, 진짜 색은 터치 시에만 공개된다.
+       (인라인 --hue 가 박혀 있지 않아야 이 클래스 값이 실제로 적용됨) */
+    --hue: #ffffff;
+    cursor: pointer;
+  }
+  .marble.face-down::before {
+    content: "?";
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    /* 흰색 마블 위에서도 잘 보이는 부드러운 보라 */
+    color: rgba(140, 100, 175, .72);
+    font-size: 60%;
+    font-weight: 800;
+    text-shadow: 0 1px 2px rgba(255, 255, 255, .9);
+    pointer-events: none;
+  }
+
+  /* 힌트 모드: 2회 연속 오답 시 다음 시도에서 정답 위치를 무채색 그대로 두고
+     반짝이는 box-shadow + 코너 ✨ 로만 살짝 안내. .face-down 에 한해서만
+     적용되므로 마블이 펼쳐지면 자동으로 효과가 사라진다. */
+  .marble.face-down.hint-sparkle {
+    animation: hint-pulse 1.2s ease-in-out infinite;
+  }
+  .marble.face-down.hint-sparkle::after {
+    content: "✨";
+    position: absolute;
+    top: -10px;
+    right: -8px;
+    font-size: 48%;
+    text-shadow: 0 0 8px rgba(255, 220, 80, .95);
+    animation: hint-twinkle .9s ease-in-out infinite alternate;
+    pointer-events: none;
+  }
+  @keyframes hint-pulse {
+    0%, 100% {
+      box-shadow:
+        0 0 0 3px rgba(255, 220, 90, .35),
+        0 0 16px 4px rgba(255, 200, 80, .55),
+        inset 0 -6px 14px rgba(0, 0, 0, .08),
+        inset 0  6px 14px rgba(255, 255, 255, .5);
+      transform: scale(1);
+    }
+    50% {
+      box-shadow:
+        0 0 0 5px rgba(255, 220, 90, .55),
+        0 0 30px 10px rgba(255, 200, 80, .85),
+        inset 0 -6px 14px rgba(0, 0, 0, .08),
+        inset 0  6px 14px rgba(255, 255, 255, .5);
+      transform: scale(1.05);
+    }
+  }
+  @keyframes hint-twinkle {
+    from { opacity: .55; transform: scale(0.80) rotate(-10deg); }
+    to   { opacity: 1.0; transform: scale(1.15) rotate( 10deg); }
+  }
+  /* 카드 뒤집힐 때 잠깐 통통 튀는 펄스 */
+  .marble.reveal-pulse {
+    animation: reveal-pulse .28s ease-out !important;
+  }
+  @keyframes reveal-pulse {
+    0%   { transform: scale(0.82); }
+    55%  { transform: scale(1.10); }
+    100% { transform: scale(1); }
+  }
+
+  /* 9단계: 따라 해봐! - 데모/정답 시 빛나는 상태 */
+  .marble.simon-light {
+    animation: none !important;
+    filter: brightness(1.35) saturate(1.3);
+    box-shadow:
+      0 0 0 6px rgba(255, 255, 255, .65),
+      0 0 32px 10px color-mix(in srgb, var(--hue) 80%, white 20%),
+      0 12px 24px rgba(80, 40, 90, .28);
+    transform: scale(1.12);
+    transition:
+      filter   .12s ease,
+      box-shadow .12s ease,
+      transform .12s ease;
+  }
+
+  /* 정답 사라짐 */
+  .marble.pop {
+    animation: pop .45s cubic-bezier(.36,1.6,.5,1) forwards !important;
+    pointer-events: none;
+  }
+  @keyframes pop {
+    0%   { transform: scale(1); opacity: 1; }
+    35%  { transform: scale(1.25); opacity: 1; }
+    100% { transform: scale(0.05); opacity: 0; }
+  }
+
+  /* 오답 흔들림 */
+  .marble.shake { animation: shake .42s ease-in-out !important; }
+  @keyframes shake {
+    0%,100% { transform: translateX(0); }
+    20%     { transform: translateX(-9px) rotate(-4deg); }
+    40%     { transform: translateX(9px)  rotate(4deg); }
+    60%     { transform: translateX(-7px) rotate(-3deg); }
+    80%     { transform: translateX(7px)  rotate(3deg); }
+  }
+
+  /* 토스트(잘못 눌렀어요!) */
+  .toast {
+    position: absolute; left: 50%; top: 18px; transform: translateX(-50%) translateY(-16px);
+    background: #fff; color: #b94472;
+    border: 2px solid #ffd0e0;
+    box-shadow: 0 8px 22px rgba(255, 130, 170, .25);
+    padding: 8px 16px; border-radius: 999px;
+    font-size: clamp(14px, 1.6vw, 18px);
+    opacity: 0; pointer-events: none;
+    transition: opacity .25s ease, transform .25s ease;
+    z-index: 5;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* 단계 전환 배너 */
+  .stage-banner {
+    position: absolute; inset: 0; display: grid; place-items: center;
+    pointer-events: none; opacity: 0; transition: opacity .25s ease;
+    z-index: 6;
+  }
+  .stage-banner.show { opacity: 1; }
+  .stage-banner .pop-card {
+    background: linear-gradient(135deg, #fff 60%, #fff0f6);
+    border: 3px solid #ffc6dc;
+    border-radius: 26px;
+    padding: 18px 28px;
+    text-align: center;
+    box-shadow: 0 16px 40px rgba(255, 130, 170, .35);
+    transform: scale(.7);
+    transition: transform .35s cubic-bezier(.36,1.6,.5,1);
+  }
+  .stage-banner.show .pop-card { transform: scale(1); }
+  .stage-banner h2 {
+    margin: 0 0 4px; color: var(--accent); font-size: clamp(22px, 3vw, 34px);
+  }
+  .stage-banner p { margin: 0; color: var(--ink-soft); font-size: clamp(14px, 1.6vw, 18px); }
+
+  /* 최종 성공 화면 */
+  .final-overlay {
+    position: fixed; inset: 0; display: none; place-items: center;
+    background: radial-gradient(at 50% 40%, rgba(255,255,255,.7), rgba(255,235,245,.6));
+    z-index: 50;
+  }
+  .final-overlay.show { display: grid; }
+  .final-card {
+    text-align: center;
+    background: #fff; border: 4px solid #ffd6e6;
+    border-radius: 32px; padding: 30px 40px;
+    box-shadow: 0 24px 60px rgba(255, 120, 170, .35);
+    max-width: 90%;
+  }
+  .final-card h1 {
+    color: var(--accent); margin: 0 0 8px;
+    font-size: clamp(28px, 4.5vw, 50px);
+  }
+  .final-card p {
+    color: var(--ink-soft); margin: 0 0 20px;
+    font-size: clamp(16px, 2vw, 22px);
+  }
+  .restart-btn {
+    border: none; cursor: pointer;
+    padding: 14px 30px; border-radius: 999px;
+    background: linear-gradient(135deg, #ff8fb1, #ffc36b);
+    color: #fff; font-family: inherit; font-size: clamp(18px, 2.2vw, 24px);
+    box-shadow: 0 10px 24px rgba(255, 130, 160, .45);
+    transition: transform .15s ease;
+  }
+  .restart-btn:hover { transform: translateY(-2px) scale(1.03); }
+  .restart-btn:active { transform: translateY(0) scale(0.97); }
+
+  canvas.fireworks {
+    position: fixed; inset: 0; pointer-events: none; z-index: 49;
+  }
+
+  /* 한글 기차 오버레이 (마지막 10단계 성공 시) */
+  .train-overlay {
+    position: fixed; inset: 0;
+    pointer-events: none; z-index: 48;
+    display: flex; align-items: center;
+    overflow: hidden;
+    opacity: 0;
+    transition: opacity .25s ease;
+    background: linear-gradient(180deg,
+      rgba(255,255,255,0) 35%,
+      rgba(255, 230, 200, .35) 50%,
+      rgba(255,255,255,0) 70%);
+  }
+  .train-overlay.run { opacity: 1; }
+
+  .train {
+    display: inline-flex; align-items: center; gap: 6px;
+    white-space: nowrap;
+    transform: translateX(-110%);
+    padding: 0 40px;
+    filter: drop-shadow(0 10px 14px rgba(60,30,80,0.25));
+    font-size: clamp(34px, 5vw, 56px);
+  }
+  .train.run {
+    animation: train-run 4.8s cubic-bezier(.45,.1,.55,1) forwards;
+  }
+  @keyframes train-run {
+    0%   { transform: translateX(-110%); }
+    100% { transform: translateX(110vw); }
+  }
+
+  /* 기관차는 emoji 기본 방향(오른쪽)을 향한 채 그대로 사용 */
+  .train .loco,
+  .train .smoke {
+    display: inline-block;
+    animation: chuff .18s ease-in-out infinite;
+  }
+  .train .smoke { animation-duration: .25s; }
+  @keyframes chuff {
+    0%,100% { transform: translateY(0) rotate(0deg); }
+    50%    { transform: translateY(-3px) rotate(-2deg); }
+  }
+
+  .train .car {
+    display: inline-grid; place-items: center;
+    width: clamp(40px, 5.5vw, 60px);
+    height: clamp(40px, 5.5vw, 60px);
+    border-radius: 16px;
+    background: linear-gradient(180deg,
+      var(--c, #ffd1e1) 0%,
+      color-mix(in srgb, var(--c, #ffd1e1) 70%, #000 30%) 130%);
+    color: white;
+    font-family: 'Jua', 'Gaegu', sans-serif;
+    font-size: clamp(20px, 3vw, 30px);
+    text-shadow: 0 2px 4px rgba(0,0,0,.25);
+    border: 3px solid white;
+    box-shadow:
+      0 6px 12px rgba(0,0,0,.18),
+      inset 0 -4px 8px rgba(0,0,0,.10),
+      inset 0 4px 8px rgba(255,255,255,.4);
+    position: relative;
+  }
+  /* 객차 바퀴 */
+  .train .car::after {
+    content: "";
+    position: absolute;
+    bottom: -8px; left: 8%; right: 8%;
+    height: 6px;
+    background:
+      radial-gradient(circle at 18% 50%, #4a3050 30%, transparent 33%),
+      radial-gradient(circle at 82% 50%, #4a3050 30%, transparent 33%);
+  }
+  .train .coupling {
+    display: inline-block;
+    width: 6px; height: 4px;
+    background: #6b5a7a;
+    border-radius: 2px;
+    margin: 0 -2px;
+  }
+
+  /* 안내용 색상 표시 점 */
+  .color-chip {
+    display: inline-block; width: 22px; height: 22px; border-radius: 50%;
+    vertical-align: middle; margin: 0 6px; border: 2px solid #fff;
+    box-shadow: 0 4px 8px rgba(0,0,0,.15);
+  }
+
+  /* ===========================================================
+     7단계: 색·개수 드래그 놀이 (좌측 마블 그리드 + 우측 접시)
+     =========================================================== */
+  .marble-area[data-stage="tray"] {
+    display: grid;
+    grid-template-columns: 1.45fr 1fr;
+    gap: clamp(10px, 1.8vw, 22px);
+    padding: 6px;
+    align-items: stretch;
+  }
+  .marble-area[data-stage="tray"] #marble-grid {
+    width: 100%; height: 100%;
+  }
+  @media (max-width: 720px) {
+    .marble-area[data-stage="tray"] {
+      grid-template-columns: 1fr;
+      grid-template-rows: 1.6fr 1fr;
+    }
+  }
+
+  /* 좌측 그리드 각 칸을 감싸는 슬롯: 마블이 드래그로 떠올라도 칸 크기 유지 */
+  .tray-source-slot {
+    display: grid; place-items: center;
+    width: 100%; height: 100%;
+    position: relative;
+  }
+
+  /* 우측 접시 */
+  .tray-panel {
+    position: relative;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 12px;
+    background:
+      radial-gradient(at 50% 100%, rgba(255,255,255,.7), transparent 70%),
+      linear-gradient(135deg, #fff 0%, #fff5f8 60%, #ffeef5 100%);
+    border: 4px dashed #ffcadd;
+    border-radius: clamp(20px, 3vw, 32px);
+    padding: clamp(12px, 1.8vw, 22px);
+    box-shadow:
+      0 16px 30px rgba(255, 130, 170, 0.18),
+      inset 0 4px 10px rgba(255,255,255,.6);
+    transition: transform .15s ease, border-color .15s ease, background .15s ease;
+  }
+  .tray-panel.over {
+    border-color: var(--accent);
+    background: linear-gradient(135deg, #fff 0%, #ffe1ee 100%);
+    transform: scale(1.02);
+  }
+  .tray-panel .tray-label {
+    font-size: clamp(14px, 1.6vw, 18px);
+    color: var(--ink-soft);
+  }
+  .tray-slots {
+    display: flex; flex-wrap: wrap; gap: clamp(8px, 1.2vw, 14px);
+    justify-content: center; align-items: center;
+    min-height: clamp(60px, 9vw, 100px);
+  }
+  .tray-slot {
+    /* iOS Safari 의 flex+aspect-ratio 자동 확장 이슈 회피를 위해
+       width/height 를 모두 명시하고, flex grow/shrink 를 0 으로 잠근다. */
+    width:  clamp(48px, 7vw, 76px);
+    height: clamp(48px, 7vw, 76px);
+    flex: 0 0 auto;
+    min-width: 0;
+    min-height: 0;
+    box-sizing: border-box;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.55);
+    border: 2px dashed rgba(180,140,160,0.45);
+    display: grid; place-items: center;
+  }
+  /* 슬롯 안의 마블은 #marble-grid 의 --marble-size 변수에 의존하지 않고
+     항상 슬롯 컨텐츠 박스를 채우도록 한다. */
+  .tray-slot > .marble {
+    width: 100%;
+    height: 100%;
+  }
+  .tray-counter {
+    display: flex; gap: clamp(8px, 1.2vw, 14px); flex-wrap: wrap;
+    justify-content: center;
+  }
+  .tray-counter .item {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: #fff; padding: 5px 14px; border-radius: 999px;
+    border: 2px solid #ffe2ee;
+    font-size: clamp(13px, 1.5vw, 17px);
+    color: var(--ink);
+    transition: all .2s ease;
+  }
+  .tray-counter .item.done {
+    background: linear-gradient(135deg, #ffd7e9, #ffe7c0);
+    border-color: #ffb3cf;
+    transform: scale(1.04);
+  }
+  .tray-counter .item .chip {
+    display: inline-block; width: 16px; height: 16px;
+    border-radius: 50%; border: 2px solid #fff;
+    box-shadow: 0 2px 4px rgba(0,0,0,.15);
+  }
+
+  /* 드래그 상태 */
+  .marble.dragging {
+    position: fixed !important;
+    z-index: 100;
+    pointer-events: none;
+    animation: none !important;
+    transition: none;
+    transform: scale(1.08);
+    cursor: grabbing;
+    box-shadow:
+      0 18px 40px rgba(80, 40, 90, .35),
+      inset 0 -6px 14px rgba(0,0,0,.08),
+      inset 0 6px 14px rgba(255,255,255,.5);
+  }
+  .marble.snapping {
+    position: fixed !important;
+    z-index: 100;
+    pointer-events: none;
+    animation: none !important;
+    transition:
+      left   .26s ease,
+      top    .26s ease,
+      width  .26s ease,
+      height .26s ease,
+      transform .26s ease;
+  }
+  .marble.placed {
+    pointer-events: none;
+    animation: none !important;
+    transform: scale(.94);
+    transition: transform .25s ease;
+    box-shadow:
+      0 6px 14px rgba(80, 40, 90, .15),
+      inset 0 -4px 10px rgba(0,0,0,.08),
+      inset 0 4px 10px rgba(255,255,255,.5);
+  }
+
+  /* 모바일 (세로) 보정 */
+  @media (max-width: 640px) {
+    .stage-wrap { width: 94vw; height: 90vh; padding: 12px; border-radius: 22px; }
+  }

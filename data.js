@@ -185,23 +185,25 @@
   }
 
   // [3단계·신규] 가장 많이 있는 구슬 찾기
-  // 24개를 6색으로 나눠 배치하되 한 색은 6개(최다), 한 색은 2개(최소), 나머지
-  // 4색은 각 4개(평균) → [6,4,4,4,4,2] = 24. 먼저 "가장 많은" 색을 모두 없애고,
-  // 이어서 "가장 적은" 색을 모두 없애는 2단계 세부 문제로 구성된다.
+  // 24개를 6색으로 분배: 최다 7개, 최소 2개, 나머지 [4,4,4,3] → [7,4,4,4,3,2] = 24.
+  // 최다(7)를 도드라지게 해 한눈에 잘 보이도록 했다. 먼저 "가장 많은" 색을 모두
+  // 없애고, 이어서 "가장 적은" 색을 모두 없애는 2단계 세부 문제로 구성된다.
   function generateStage11() {
     const count = 24;
     const numColors = 6;
     // 대비가 뚜렷한 빨·주·노·초·파·보 6색만 사용 (MISSION_COLORS = 정확히 이 6색)
     const chosen = shuffle(Object.entries(MISSION_COLORS)); // [hex, name] tuple 6개
-    // 6색 중 최다(6개)·최소(2개) 색을 서로 다르게 무작위 지정
+    // 최다(7)·최소(2)·중간저(3) 색을 서로 다르게 무작위 지정, 나머지 3색은 4개씩
     const order = shuffle(range(numColors));
     const mostColorIdx = order[0];
     const leastColorIdx = order[1];
+    const thirdColorIdx = order[2]; // 3개짜리 디스트랙터
 
     const counts = [];
     for (let i = 0; i < numColors; i++) {
-      if (i === mostColorIdx) counts.push(6);
+      if (i === mostColorIdx) counts.push(7);
       else if (i === leastColorIdx) counts.push(2);
+      else if (i === thirdColorIdx) counts.push(3);
       else counts.push(4);
     }
 
@@ -219,7 +221,7 @@
       colors: colors,
       most_color: chosen[mostColorIdx][0],
       most_name: chosen[mostColorIdx][1],
-      most_count: 6,
+      most_count: 7,
       least_color: chosen[leastColorIdx][0],
       least_name: chosen[leastColorIdx][1],
       least_count: 2,

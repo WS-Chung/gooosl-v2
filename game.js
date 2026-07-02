@@ -67,18 +67,49 @@
   function sfxStageClear() {
     [523, 659, 784, 1046].forEach((f, i) => tone(f, 0.18, "triangle", 0.22, i * 0.10));
   }
-  // 여러 구슬이 '동시에' 터지는 풍선/폭죽 소리 ("파파팡!")
+  // 여러 구슬이 '동시에' 터지는 풍선/타악기 소리 ("파파팡!")
+  // 멜로디성 톤 대신 노이즈 기반의 탁한 타격음 + 저역 드럼 바디로 구성.
+  function noiseHit(ctx, when, dur, cutoff) {
+    // 짧은 화이트노이즈를 로우패스로 눌러 '탁/팡' 같은 타격 어택을 만든다.
+    const len = Math.max(1, Math.floor(ctx.sampleRate * dur));
+    const buffer = ctx.createBuffer(1, len, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    const filt = ctx.createBiquadFilter();
+    filt.type = "lowpass";
+    filt.frequency.setValueAtTime(cutoff, when);
+    filt.frequency.exponentialRampToValueAtTime(Math.max(300, cutoff * 0.28), when + dur);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, when);
+    g.gain.exponentialRampToValueAtTime(0.5, when + 0.004); // 빠른 어택
+    g.gain.exponentialRampToValueAtTime(0.0001, when + dur); // 빠른 감쇠
+    src.connect(filt).connect(g).connect(ctx.destination);
+    src.start(when);
+    src.stop(when + dur + 0.02);
+  }
   function sfxBurst(count) {
-    const n = Math.min(Math.max(count || 2, 2), 6);
-    // 거의 동시(≤36ms)의 팝들을 겹쳐 풍성한 '팡' — 지각적으로 하나의 터짐
-    for (let i = 0; i < n; i++) {
-      const off = i * 0.006;
-      tone(680 + Math.random() * 520, 0.10, "triangle", 0.15, off);
-      tone(1200 + Math.random() * 650, 0.08, "triangle", 0.11, off + 0.02);
+    const ctx = ac();
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    const n = Math.min(Math.max(count || 2, 2), 7);
+    // 1) 노이즈 타격들을 아주 짧은 간격(12ms)으로 겹쳐 '파파팡' 탁한 어택
+    for (let i = 0; i < Math.min(n, 4); i++) {
+      noiseHit(ctx, t + i * 0.012, 0.11, 1100 + Math.random() * 1500);
     }
-    // 저역 '펑' 바디 + 반짝이는 꼬리
-    tone(170, 0.16, "sine", 0.20, 0);
-    tone(1760, 0.14, "sine", 0.09, 0.05);
+    // 2) 저역 드럼 바디 — 피치가 뚝 떨어지는 묵직한 '펑' (타악기 느낌)
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(210, t);
+    osc.frequency.exponentialRampToValueAtTime(55, t + 0.18);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.5, t + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.28);
+    osc.connect(g).connect(ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.3);
   }
   function sfxFinal() {
     [523, 659, 784, 1046, 1318, 1568].forEach((f, i) => tone(f, 0.20, "triangle", 0.22, i * 0.12));

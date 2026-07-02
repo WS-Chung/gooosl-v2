@@ -106,46 +106,40 @@
   //  스테이지별 데이터 생성기
   // ─────────────────────────────────────────────────────────────
 
-  function generateStage1() {
-    const count = 12;
-    const big_index = randrange(count);
-    // 12개 → 무지개 7원색에서 무작위 추출 (중복 허용). 색은 장식이고
-    // 정답은 크기로만 식별하므로 색 중복은 게임에 영향 없음.
-    const colors = [];
-    for (let i = 0; i < count; i++) colors.push(choice(RAINBOW_HEXES));
-    return {
-      id: 1,
-      title: "어떤 구슬이 가장 클까?",
-      instruction: "가장 큰 구슬을 콕! 찾아보자",
-      count: count,
-      colors: colors,
-      big_index: big_index,
-      big_scale: 1.2,
-      targets_total: 1,
-    };
-  }
-
+  // [1단계] 반짝반짝 불이 켜진 구슬! (24개 확장 + 3판 반복)
+  // 24개 중 9~12개에 불이 켜지고, 켜진 구슬을 누르면 사라지지 않고 일반(꺼진)
+  // 구슬로 바뀐다. 한 판의 불을 모두 끄면 새 판이 시작되고, 총 3판을 모두
+  // 끝내야 단계 성공. 무작위성은 data.js 가 소유하므로 3판치 불 배치를 미리 생성.
   function generateStage2() {
-    const count = 15;
-    const lit_count = randint(3, 6);
-    const lit_indices = sample(range(count), lit_count).slice().sort((a, b) => a - b);
+    const count = 24;
+    const rounds = 3;
+    const lit_rounds = [];
+    for (let r = 0; r < rounds; r++) {
+      const lit_count = randint(9, 12);
+      const lit_indices = sample(range(count), lit_count).slice().sort((a, b) => a - b);
+      lit_rounds.push(lit_indices);
+    }
     return {
       id: 2,
       title: "반짝반짝 불이 켜진 구슬!",
-      instruction: "반짝이는 구슬을 모두 찾아 톡 터뜨려보자",
+      instruction: "반짝이는 구슬을 모두 콕 눌러서 불을 꺼보자!",
       count: count,
-      lit_indices: lit_indices,
-      targets_total: lit_count,
+      rounds: rounds,
+      lit_rounds: lit_rounds,
+      targets_total: 0, // 렌더러가 라운드 상태로 직접 관리
     };
   }
 
+  // [2단계] 똑같은 색깔 구슬 모으기 (24개 확장)
+  // 4개 색상을 제시하고 그중 한 색을 5~6개 배치 → 그 색 구슬을 모두 찾는다.
+  // 개수가 12→24 로 늘어난 것만으로 난이도를 높였다.
   function generateStage3() {
-    const count = 12;
+    const count = 24;
     const palette_keys = sample(Object.keys(MISSION_COLORS), 4);
     const target_color = choice(palette_keys);
     const other_colors = palette_keys.filter((c) => c !== target_color);
 
-    const target_count = randint(3, 5);
+    const target_count = randint(5, 6);
     const target_indices = sample(range(count), target_count);
     const target_set = new Set(target_indices);
 
@@ -168,67 +162,125 @@
     };
   }
 
+  // [4단계] 차례차례 숫자 세기 (12개 · 오름차순 → 내림차순 2세부 단계)
+  // 1~12 숫자를 무작위 배치. 먼저 1→12 오름차순으로 누르고, 성공하면 위치를
+  // 새로 섞어 12→1 내림차순으로 누른다. 색은 장식(숫자로 식별)이라 반복 허용.
   function generateStage4() {
-    const count = 9;
-    const numbers = shuffle(range(count).map((i) => i + 1));
-    // 9칸 → 무지개 7 + 보조 2 (priority), 위치는 무작위
-    const colors = shuffle(pickPrioritizedColors(count)).map((p) => p[0]);
+    const count = 12;
+    function makeArrangement() {
+      const numbers = shuffle(range(count).map((i) => i + 1));
+      const colors = [];
+      for (let i = 0; i < count; i++) colors.push(choice(RAINBOW_HEXES));
+      return { numbers: numbers, colors: colors };
+    }
     return {
       id: 4,
       title: "차례차례 숫자 세기",
-      instruction: "1부터 9까지 순서대로 콕콕 눌러보자",
+      instruction: "1부터 12까지 순서대로 콕콕 눌러보자",
       count: count,
-      numbers: numbers,
-      colors: colors,
-      targets_total: count,
+      // [0] = 오름차순 배치, [1] = 내림차순용 재배치
+      arrangements: [makeArrangement(), makeArrangement()],
+      targets_total: 0, // 렌더러가 오름/내림 2세부 단계로 직접 관리
     };
   }
 
-  function generateStage5() {
-    const count = 12;
-    const different_indices = sample(range(count), 2).slice().sort((a, b) => a - b);
-    // 베이스 색은 무지개 1색 무작위
-    const base_color = choice(RAINBOW_HEXES);
-    const pattern = choice(["pattern-stripe", "pattern-star"]);
+  // [3단계·신규] 가장 많이 있는 구슬 찾기
+  // 24개를 6색으로 나눠 배치하되 한 색은 6개(최다), 한 색은 2개(최소), 나머지
+  // 4색은 각 4개(평균) → [6,4,4,4,4,2] = 24. 먼저 "가장 많은" 색을 모두 없애고,
+  // 이어서 "가장 적은" 색을 모두 없애는 2단계 세부 문제로 구성된다.
+  function generateStage11() {
+    const count = 24;
+    const numColors = 6;
+    // 무지개 원색에서 6색을 뽑아 선명하게 (priority 헬퍼가 원색 우선 보장)
+    const chosen = pickPrioritizedColors(numColors); // [hex, name] tuple 6개
+    // 6색 중 최다(6개)·최소(2개) 색을 서로 다르게 무작위 지정
+    const order = shuffle(range(numColors));
+    const mostColorIdx = order[0];
+    const leastColorIdx = order[1];
+
+    const counts = [];
+    for (let i = 0; i < numColors; i++) {
+      if (i === mostColorIdx) counts.push(6);
+      else if (i === leastColorIdx) counts.push(2);
+      else counts.push(4);
+    }
+
+    const colorList = [];
+    for (let i = 0; i < numColors; i++) {
+      for (let k = 0; k < counts[i]; k++) colorList.push(chosen[i][0]);
+    }
+    const colors = shuffle(colorList);
+
     return {
-      id: 5,
-      title: "모양이 다른 구슬 찾기",
-      instruction: "살~짝 다른 구슬 두 개를 찾아보자",
+      id: 11,
+      title: "가장 많이 있는 구슬 찾기",
+      instruction: "가장 많이 있는 색깔을 찾아서 없애봐!",
       count: count,
-      base_color: base_color,
-      different_indices: different_indices,
-      pattern: pattern,
-      targets_total: 2,
+      colors: colors,
+      most_color: chosen[mostColorIdx][0],
+      most_name: chosen[mostColorIdx][1],
+      most_count: 6,
+      least_color: chosen[leastColorIdx][0],
+      least_name: chosen[leastColorIdx][1],
+      least_count: 2,
+      targets_total: 0, // 렌더러가 세부 단계로 직접 관리
     };
   }
 
+  // [5단계] 어디에 있는 구슬일까? (24칸 · 6×4 고정 그리드)
+  // 기준 색은 화면에 딱 1개만 존재(유일)해서 아이가 찾을 수 있고, 거기서부터
+  // 상하좌우 1~3칸 또는 대각선 1칸 떨어진 구슬을 찾는다. 방향/거리를 다변화.
   function generateStage6Position() {
-    const cols = 3, rows = 3;
-    const count = cols * rows;
+    const cols = 6, rows = 4;
+    const count = cols * rows; // 24
 
-    // 9칸 → 무지개 7색 + 보조 2색을 priority 헬퍼로 자동 구성, 위치는 무작위
-    const chosen = shuffle(pickPrioritizedColors(count));
+    // 오프셋 후보: [설명, dr, dc]
+    const stepWord = (n, word) => (n === 1 ? ("바로 " + word) : (n + "칸 " + word));
+    const offsets = [];
+    for (let n = 1; n <= 3; n++) {
+      offsets.push([stepWord(n, "위"),     -n,  0]);
+      offsets.push([stepWord(n, "아래"),    n,  0]);
+      offsets.push([stepWord(n, "왼쪽"),    0, -n]);
+      offsets.push([stepWord(n, "오른쪽"),  0,  n]);
+    }
+    offsets.push(["왼쪽 위",    -1, -1]);
+    offsets.push(["오른쪽 위",  -1,  1]);
+    offsets.push(["왼쪽 아래",   1, -1]);
+    offsets.push(["오른쪽 아래", 1,  1]);
 
-    const colors = chosen.map((p) => p[0]);
-    const color_names = chosen.map((p) => p[1]);
-
-    const dirEntry = choice(DIRECTIONS);
-    const dir_name = dirEntry[0], dr = dirEntry[1], dc = dirEntry[2];
-    const candidates = [];
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        const nr = r + dr, nc = c + dc;
-        if (nr >= 0 && nr < rows && nc >= 0 && nc < cols) {
-          candidates.push([r, c]);
+    // 격자 안에 기준+오프셋이 들어가는 유효한 후보가 나올 때까지 오프셋 선택
+    let dirName, dr, dc, candidates;
+    do {
+      const off = choice(offsets);
+      dirName = off[0]; dr = off[1]; dc = off[2];
+      candidates = [];
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const nr = r + dr, nc = c + dc;
+          if (nr >= 0 && nr < rows && nc >= 0 && nc < cols) candidates.push([r, c]);
         }
       }
-    }
+    } while (candidates.length === 0);
+
     const refRC = choice(candidates);
     const ref_r = refRC[0], ref_c = refRC[1];
-    const ans_r = ref_r + dr, ans_c = ref_c + dc;
-
     const ref_index = ref_r * cols + ref_c;
-    const answer_index = ans_r * cols + ans_c;
+    const answer_index = (ref_r + dr) * cols + (ref_c + dc);
+
+    // 기준 색은 유일하게 1개. 나머지 칸은 다른 색들에서 무작위(반복 허용).
+    const palette = pickPrioritizedColors(7); // [hex, name] 무지개 7색
+    const refPair = palette[0];
+    const others = palette.slice(1);
+    const colors = [];
+    const color_names = [];
+    for (let i = 0; i < count; i++) {
+      if (i === ref_index) {
+        colors.push(refPair[0]); color_names.push(refPair[1]);
+      } else {
+        const p = choice(others);
+        colors.push(p[0]); color_names.push(p[1]);
+      }
+    }
 
     return {
       id: 6,
@@ -240,49 +292,10 @@
       colors: colors,
       color_names: color_names,
       ref_index: ref_index,
-      ref_color: colors[ref_index],
-      ref_color_name: color_names[ref_index],
-      direction: dir_name,
+      ref_color: refPair[0],
+      ref_color_name: refPair[1],
+      direction: dirName,
       answer_index: answer_index,
-      targets_total: 1,
-    };
-  }
-
-  function generateStage7Tray() {
-    const total = choice([3, 4]);
-    const n = randint(1, total - 1);
-    const m = total - n;
-
-    // 정답 2색 + 디스트랙터 풀 3색 = 총 5색만 필요 → 모두 무지개에서 추출
-    const pool = pickPrioritizedColors(5);
-    const target_a = pool[0];
-    const target_b = pool[1];
-    const distractor_pool = pool.slice(2, 5);
-
-    const grid_count = randint(9, 12);
-    const distractor_count = grid_count - n - m;
-    const distractors = [];
-    for (let i = 0; i < distractor_count; i++) {
-      distractors.push(choice(distractor_pool));
-    }
-
-    let marbles_arr = [];
-    for (let i = 0; i < n; i++) marbles_arr.push(target_a);
-    for (let i = 0; i < m; i++) marbles_arr.push(target_b);
-    marbles_arr = marbles_arr.concat(distractors);
-    const marbles_shuffled = shuffle(marbles_arr);
-
-    return {
-      id: 7,
-      title: "예쁜 접시에 담아줘",
-      instruction: "",
-      count: grid_count,
-      marbles: marbles_shuffled.map((p) => ({ color: p[0], name: p[1] })),
-      targets: [
-        { color: target_a[0], name: target_a[1], count: n },
-        { color: target_b[0], name: target_b[1], count: m },
-      ],
-      tray_total: n + m,
       targets_total: 1,
     };
   }
@@ -307,18 +320,21 @@
     };
   }
 
+  // [6단계] 따라 해봐! (16칸 · 4×4 · 5개 시퀀스)
+  // 색은 장식(위치 index 로 식별)이라 무지개에서 반복 추출. 빛나는 순서 5개를
+  // 데모로 보여준 뒤 아이가 그대로 따라 누른다.
   function generateStage9Simon() {
-    const count = 9;
-    const sequence_len = 4;
-    // 9칸 → 무지개 7 + 보조 2 (priority), 위치는 무작위
-    const colors = shuffle(pickPrioritizedColors(count)).map((p) => p[0]);
+    const count = 16;
+    const sequence_len = 5;
+    const colors = [];
+    for (let i = 0; i < count; i++) colors.push(choice(RAINBOW_HEXES));
     const sequence = sample(range(count), sequence_len);
     return {
       id: 9,
       title: "따라 해봐!",
       instruction: "구슬이 빛나는 순서대로 콕콕 눌러보자!",
       count: count,
-      cols: 3,
+      cols: 4,
       colors: colors,
       sequence: sequence,
       sequence_len: sequence_len,
@@ -347,17 +363,15 @@
   function generateAllStages() {
     return {
       stages: [
-        // 새 난이도 곡선: 쉬운 인지 → 순차/공간 → 기억·소근육 → 한글 서열
-        generateStage1(),         // 1단계: 가장 큰 구슬 (크기 변별)
-        generateStage5(),         // 2단계: 모양 다른 (변별/집중)
-        generateStage2(),         // 3단계: 반짝이는 구슬 (시각 인지)
-        generateStage3(),         // 4단계: 색상 매칭
-        generateStage4(),         // 5단계: 1→9 수 서열
-        generateStage6Position(), // 6단계: 색·방향 공간 인지
-        generateStage9Simon(),    // 7단계: 따라 해봐! 순차 기억
-        generateStage7Tray(),     // 8단계: 색·개수 드래그
-        generateStage8Memory(),   // 9단계: 짝 찾기 (작업 기억)
-        generateStage10(),        // 10단계: 한글 기차 (마지막)
+        // 총 8단계. 난이도 곡선: 시각 인지 → 색·수량 → 순차/공간 → 기억 → 한글 서열
+        generateStage2(),         // 1단계: 반짝이는 구슬 (24개·3회, 시각 인지)
+        generateStage3(),         // 2단계: 색상 매칭 (24개)
+        generateStage11(),        // 3단계: 가장 많이/적게 있는 색 (수량 비교)
+        generateStage4(),         // 4단계: 1↔24 수 서열 (오름/내림)
+        generateStage6Position(), // 5단계: 색·방향 공간 인지 (24칸)
+        generateStage9Simon(),    // 6단계: 따라 해봐! 순차 기억 (5개)
+        generateStage8Memory(),   // 7단계: 짝 찾기 (작업 기억)
+        generateStage10(),        // 8단계: 한글 기차 (마지막)
       ],
     };
   }

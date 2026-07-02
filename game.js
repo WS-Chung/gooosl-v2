@@ -123,6 +123,7 @@
     if (count === 12) return w < 520 ? 3 : 4;
     if (count === 14) return w < 520 ? 4 : (w < 900 ? 5 : 7);
     if (count === 15) return w < 520 ? 3 : 5;
+    if (count === 24) return w < 520 ? 4 : 6; // 1·2·3단계 확장 그리드
     return Math.min(5, Math.ceil(Math.sqrt(count)));
   }
 
@@ -220,16 +221,15 @@
     state.current_target_index = 0;
     state.locked = false;
 
-    // 이전 스테이지에서 남았을 수 있는 7단계 트레이 흔적 정리
-    marbleArea.removeAttribute("data-stage");
-    const oldTray = document.getElementById("tray-panel");
-    if (oldTray) oldTray.remove();
+    // 이전 스테이지(6단계 '따라 해봐!')에서 남았을 수 있는 '다시 보여줘' 버튼 정리
+    const oldReplay = document.getElementById("replay-btn");
+    if (oldReplay) oldReplay.remove();
 
     stageTitleEl.textContent = stage.title;
     clearGrid();
     setupGrid(stage.count, stage.cols);
 
-    // 인스트럭션 (3·6·7단계는 색칩 등 강조 포함)
+    // 인스트럭션 (2·5단계는 색칩 등 강조 포함)
     if (stage.id === 3) {
       instructionEl.innerHTML =
         `<span class="color-chip" style="background:${stage.target_color}"></span>` +
@@ -239,26 +239,15 @@
         `<span class="color-chip" style="background:${stage.ref_color}"></span>` +
         `<span class="accent">${stage.ref_color_name}</span> 구슬 ` +
         `<span class="accent">${stage.direction}</span>에 있는 구슬을 찾아봐~`;
-    } else if (stage.id === 7) {
-      const t = stage.targets;
-      instructionEl.innerHTML =
-        `<span class="color-chip" style="background:${t[0].color}"></span>` +
-        `<span class="accent">${t[0].name}</span> 구슬 ` +
-        `<span class="accent">${t[0].count}개</span>와 ` +
-        `<span class="color-chip" style="background:${t[1].color}"></span>` +
-        `<span class="accent">${t[1].name}</span> 구슬 ` +
-        `<span class="accent">${t[1].count}개</span>를 접시에 올려줘!`;
     } else {
       instructionEl.textContent = stage.instruction;
     }
 
-    if (stage.id === 1) renderStage1(stage);
-    else if (stage.id === 2) renderStage2(stage);
+    if (stage.id === 2) renderStage2(stage);
     else if (stage.id === 3) renderStage3(stage);
+    else if (stage.id === 11) renderStage11(stage);
     else if (stage.id === 4) renderStage4(stage);
-    else if (stage.id === 5) renderStage5(stage);
     else if (stage.id === 6) renderStage6(stage);
-    else if (stage.id === 7) renderStage7(stage);
     else if (stage.id === 8) renderStage8(stage);
     else if (stage.id === 9) renderStage9(stage);
     else if (stage.id === 10) renderStage10(stage);
@@ -275,31 +264,64 @@
     return m;
   }
 
-  // [1] 큰 구슬
-  function renderStage1(stage) {
+  // [1단계] 반짝반짝 불이 켜진 구슬! (24개 · 3판 반복)
+  // 마블은 한 번만 만들어두고, 판이 바뀔 때마다 bulb-on/bulb-off 클래스만
+  // 갈아끼운다. 켜진 구슬을 누르면 사라지지 않고 꺼진(일반) 구슬로 바뀐다.
+  function renderStage2(stage) {
+    const roundState = { round: 0, remaining: 0, marbles: [] };
     for (let i = 0; i < stage.count; i++) {
-      const isBig = (i === stage.big_index);
-      const m = makeMarble({
-        color: stage.colors[i],
-        extraClass: isBig ? ["big"] : [],
-        aria: isBig ? "가장 큰 구슬" : "구슬",
-      });
-      m.addEventListener("click", () => onClick(m, isBig, "single"));
+      const m = makeMarble({ aria: "구슬" });
+      m.dataset.idx = i;
+      m.addEventListener("click", () => onLitClick(m, stage, roundState));
       gridEl.appendChild(m);
+      roundState.marbles.push(m);
     }
+    applyLitRound(stage, roundState);
   }
 
-  // [2] 불 켜진 구슬
-  function renderStage2(stage) {
-    const lit = new Set(stage.lit_indices);
-    for (let i = 0; i < stage.count; i++) {
-      const isLit = lit.has(i);
-      const m = makeMarble({
-        extraClass: [isLit ? "bulb-on" : "bulb-off"],
-        aria: isLit ? "반짝이는 구슬" : "꺼진 구슬",
-      });
-      m.addEventListener("click", () => onClick(m, isLit, "multi"));
-      gridEl.appendChild(m);
+  // 현재 라운드의 불 배치를 마블들에 적용 + 남은 개수/안내문 갱신
+  function applyLitRound(stage, roundState) {
+    const lit = new Set(stage.lit_rounds[roundState.round]);
+    roundState.remaining = lit.size;
+    roundState.marbles.forEach((m, i) => {
+      const on = lit.has(i);
+      m.classList.toggle("bulb-on", on);
+      m.classList.toggle("bulb-off", !on);
+      m.setAttribute("aria-label", on ? "반짝이는 구슬" : "구슬");
+    });
+    instructionEl.textContent = stage.instruction;
+  }
+
+  function onLitClick(m, stage, roundState) {
+    if (state.locked) return;
+    // 이미 꺼진(일반) 구슬은 무반응 — 오답 처벌 없이 관대하게 넘어감
+    if (!m.classList.contains("bulb-on")) return;
+
+    // 불 끄기: 사라지지 않고 꺼진 구슬로 전환
+    sfxPop();
+    m.classList.remove("bulb-on");
+    m.classList.add("bulb-off");
+    m.classList.add("reveal-pulse");
+    m.setAttribute("aria-label", "구슬");
+    setTimeout(() => m.classList.remove("reveal-pulse"), 280);
+    roundState.remaining -= 1;
+
+    if (roundState.remaining > 0) return;
+
+    // 한 판 완료
+    roundState.round += 1;
+    if (roundState.round >= stage.rounds) {
+      state.locked = true;
+      setTimeout(() => onStageClear(), 320);
+    } else {
+      // 다음 회차로: 잠깐 축하 후 새 불이 다시 켜짐 (자연스럽게 반복)
+      state.locked = true;
+      showToast("잘했어! 또 반짝이는 구슬이 나타났어~");
+      sfxStageClear();
+      setTimeout(() => {
+        state.locked = false;
+        applyLitRound(stage, roundState);
+      }, 800);
     }
   }
 
@@ -314,44 +336,120 @@
     }
   }
 
-  // [4] 숫자 1→9 순서
+  // [4단계] 차례차례 숫자 세기 (1→24 오름차순 → 24→1 내림차순)
   function renderStage4(stage) {
+    const numState = { phase: 0 }; // 0 = 오름차순, 1 = 내림차순
+    renderNumberPhase(stage, numState);
+  }
+
+  function renderNumberPhase(stage, numState) {
+    const asc = (numState.phase === 0);
+    const arr = stage.arrangements[numState.phase];
+    const phaseState = { progress: 0 };
+
+    clearGrid();
+    setupGrid(stage.count, stage.cols);
+    instructionEl.textContent = asc
+      ? "1부터 12까지 작은 수부터 차례대로 눌러보자!"
+      : "이번엔 12부터 1까지 큰 수부터 거꾸로 눌러보자!";
+
     for (let i = 0; i < stage.count; i++) {
-      const num = stage.numbers[i];
+      const num = arr.numbers[i];
       const m = makeMarble({
-        color: stage.colors[i],
+        color: arr.colors[i],
         text: String(num),
         aria: `숫자 ${num}`,
       });
       m.dataset.num = num;
-      m.addEventListener("click", () => {
-        if (state.locked) return;
-        const expected = state.current_target_index + 1;
-        const ok = (num === expected);
-        if (ok) {
-          state.current_target_index += 1;
-          onClick(m, true, "ordered");
-        } else {
-          shake(m);
-          showToast("다음은 " + expected + "번이야!");
-          sfxWrong();
-        }
-      });
+      m.addEventListener("click", () => onNumberClick(m, num, stage, numState, phaseState));
       gridEl.appendChild(m);
     }
   }
 
-  // [5] 모양이 다른 구슬
-  function renderStage5(stage) {
-    const diff = new Set(stage.different_indices);
+  function onNumberClick(m, num, stage, numState, phaseState) {
+    if (state.locked) return;
+    if (m.disabled) return;
+    const asc = (numState.phase === 0);
+    const expected = asc ? (phaseState.progress + 1) : (stage.count - phaseState.progress);
+    if (num !== expected) {
+      shake(m);
+      showToast(`다음은 ${expected}번이야!`);
+      sfxWrong();
+      return;
+    }
+
+    sfxPop();
+    pop(m);
+    phaseState.progress += 1;
+    if (phaseState.progress < stage.count) return;
+
+    if (numState.phase === 0) {
+      // 오름차순 완료 → 위치를 새로 섞어 내림차순 세부 단계로
+      numState.phase = 1;
+      state.locked = true;
+      showToast("잘했어! 이번엔 거꾸로 세어보자~");
+      sfxStageClear();
+      setTimeout(() => {
+        state.locked = false;
+        renderNumberPhase(stage, numState);
+      }, 1000);
+    } else {
+      state.locked = true;
+      setTimeout(() => onStageClear(), 320);
+    }
+  }
+
+  // [3단계·신규] 가장 많이 / 가장 적게 있는 색 찾기
+  // 세부 1단계: 가장 많은(5개) 색을 모두 터뜨림 → 세부 2단계: 가장 적은(3개) 색을
+  // 모두 터뜨림. 두 세부 단계를 마치면 단계 성공.
+  function renderStage11(stage) {
+    const subState = { step: 0, remaining: 0, targetColor: null };
     for (let i = 0; i < stage.count; i++) {
-      const isDiff = diff.has(i);
-      const m = makeMarble({
-        color: stage.base_color,
-        extraClass: isDiff ? [stage.pattern] : [],
-      });
-      m.addEventListener("click", () => onClick(m, isDiff, "multi"));
+      const m = makeMarble({ color: stage.colors[i], aria: "구슬" });
+      m.dataset.color = stage.colors[i];
+      m.addEventListener("click", () => onMostClick(m, stage, subState));
       gridEl.appendChild(m);
+    }
+    startMostStep(stage, subState);
+  }
+
+  function startMostStep(stage, subState) {
+    const isMost = (subState.step === 0);
+    subState.targetColor = isMost ? stage.most_color : stage.least_color;
+    subState.remaining   = isMost ? stage.most_count : stage.least_count;
+    instructionEl.innerHTML = isMost
+      ? "가장 <span class=\"accent\">많이</span> 있는 색깔을 찾아서 없애봐!"
+      : "이번엔 가장 <span class=\"accent\">조금</span> 있는 색깔을 찾아서 없애봐!";
+  }
+
+  function onMostClick(m, stage, subState) {
+    if (state.locked) return;
+    if (m.disabled) return; // 이미 터진 구슬
+    if (m.dataset.color !== subState.targetColor) {
+      shake(m);
+      showToast(randomEncourage());
+      sfxWrong();
+      return;
+    }
+
+    sfxPop();
+    pop(m);
+    subState.remaining -= 1;
+    if (subState.remaining > 0) return;
+
+    if (subState.step === 0) {
+      // 세부 2단계(가장 적은 색)로 전환
+      subState.step = 1;
+      state.locked = true;
+      showToast("잘했어! 이번엔 가장 조금 있는 색이야~");
+      sfxStageClear();
+      setTimeout(() => {
+        state.locked = false;
+        startMostStep(stage, subState);
+      }, 900);
+    } else {
+      state.locked = true;
+      setTimeout(() => onStageClear(), 320);
     }
   }
 
@@ -365,307 +463,6 @@
       const isAnswer = (i === stage.answer_index);
       m.addEventListener("click", () => onClick(m, isAnswer, "single"));
       gridEl.appendChild(m);
-    }
-  }
-
-  // [7] 색·개수 놀이 - 드래그로 접시에 담기
-  function renderStage7(stage) {
-    // 좌·우 분할 레이아웃 활성화 (CSS 가 선택자로 적용)
-    marbleArea.setAttribute("data-stage", "tray");
-
-    // 트레이 상태 초기화
-    const trayState = {
-      counts: {},                // { "빨간색": 1, "파란색": 0 }
-      targetMap: new Map(),      // name -> { color, name, count }
-      panel: null, slots: null, counterEl: null,
-    };
-    for (const t of stage.targets) {
-      trayState.counts[t.name] = 0;
-      trayState.targetMap.set(t.name, t);
-    }
-
-    // 좌측: 슬롯 래퍼로 감싼 마블 배치 → 드래그로 떠올라도 그리드 칸 유지
-    for (let i = 0; i < stage.count; i++) {
-      const data = stage.marbles[i];
-      const wrap = document.createElement("div");
-      wrap.className = "tray-source-slot";
-
-      const m = makeMarble({
-        color: data.color,
-        aria: `${data.name} 구슬`,
-      });
-      m.dataset.colorName = data.name;
-      m.dataset.color = data.color;
-
-      attachTrayDrag(m, stage, trayState);
-
-      wrap.appendChild(m);
-      gridEl.appendChild(wrap);
-    }
-
-    // 우측: 접시 패널을 marble-area 의 형제로 추가
-    const panel = buildTrayPanel(stage);
-    marbleArea.appendChild(panel);
-    trayState.panel = panel;
-    trayState.slots = panel.querySelector(".tray-slots");
-    trayState.counterEl = panel.querySelector(".tray-counter");
-    refreshTrayCounter(stage, trayState);
-  }
-
-  function buildTrayPanel(stage) {
-    const panel = document.createElement("div");
-    panel.id = "tray-panel";
-    panel.className = "tray-panel";
-
-    const label = document.createElement("div");
-    label.className = "tray-label";
-    label.textContent = "🍽 예쁜 접시";
-    panel.appendChild(label);
-
-    const slots = document.createElement("div");
-    slots.className = "tray-slots";
-    for (let i = 0; i < stage.tray_total; i++) {
-      const s = document.createElement("div");
-      s.className = "tray-slot";
-      slots.appendChild(s);
-    }
-    panel.appendChild(slots);
-
-    const counter = document.createElement("div");
-    counter.className = "tray-counter";
-    panel.appendChild(counter);
-
-    return panel;
-  }
-
-  function refreshTrayCounter(stage, trayState) {
-    trayState.counterEl.innerHTML = "";
-    for (const t of stage.targets) {
-      const item = document.createElement("div");
-      item.className = "item";
-      if (trayState.counts[t.name] >= t.count) item.classList.add("done");
-      item.innerHTML =
-        `<span class="chip" style="background:${t.color}"></span>` +
-        `<span>${t.name} ${trayState.counts[t.name]} / ${t.count}</span>`;
-      trayState.counterEl.appendChild(item);
-    }
-  }
-
-  // 마블 한 개에 Pointer Events 기반 드래그를 부착.
-  // 마우스/터치/펜을 단일 코드 경로로 처리하며, setPointerCapture 로 손가락이
-  // 마블 밖으로 나가도 이벤트가 끊기지 않도록 보장한다.
-  function attachTrayDrag(marble, stage, trayState) {
-    let drag = null;
-
-    marble.addEventListener("pointerdown", onDown);
-
-    function onDown(e) {
-      if (state.locked) return;
-      if (marble.classList.contains("placed")) return;
-      if (drag) return;
-
-      e.preventDefault();
-
-      const rect = marble.getBoundingClientRect();
-      drag = {
-        pointerId: e.pointerId,
-        startX: rect.left,
-        startY: rect.top,
-        offsetX: e.clientX - rect.left,
-        offsetY: e.clientY - rect.top,
-        width: rect.width,
-        height: rect.height,
-        // position:fixed 컨테이닝 블록의 viewport 좌표 (브라우저별로 다름)
-        cbX: 0,
-        cbY: 0,
-      };
-
-      try { marble.setPointerCapture(e.pointerId); } catch (_) {}
-
-      // 너비/높이를 명시적으로 박아두어 부모 분리 후에도 같은 크기 유지.
-      marble.style.width  = drag.width  + "px";
-      marble.style.height = drag.height + "px";
-      marble.classList.add("dragging");
-
-      // ★ Windows Chrome 좌표 보정:
-      // .stage-wrap 의 backdrop-filter 처럼 ancestor 의 일부 CSS 속성이 있으면
-      // position:fixed 의 기준점이 viewport 가 아니라 그 ancestor 박스가 된다.
-      // (예: 좌측에 250px 떨어진 박스가 컨테이닝 블록이면 style.left=500 이
-      //  실제로는 viewport 750 위치에 그려진다.)
-      // 빈 좌표(0,0)를 한 번 그어 실제 viewport 위치를 측정 → 오프셋을 구한 뒤
-      // 모든 좌표 계산에서 빼준다. 컨테이닝 블록이 viewport 인 브라우저(iOS 등)
-      // 에서는 (0,0) 이 그대로 반환되어 보정값이 0 → no-op 으로 동작한다.
-      marble.style.left = "0px";
-      marble.style.top  = "0px";
-      const probe = marble.getBoundingClientRect();
-      drag.cbX = probe.left;
-      drag.cbY = probe.top;
-
-      // 컨테이닝 블록 좌표계로 환산하여 원래 위치에 정확히 안착
-      marble.style.left = (rect.left - drag.cbX) + "px";
-      marble.style.top  = (rect.top  - drag.cbY) + "px";
-
-      marble.addEventListener("pointermove", onMove);
-      marble.addEventListener("pointerup", onUp);
-      marble.addEventListener("pointercancel", onCancel);
-    }
-
-    function onMove(e) {
-      if (!drag || e.pointerId !== drag.pointerId) return;
-      const x = e.clientX - drag.offsetX - drag.cbX;
-      const y = e.clientY - drag.offsetY - drag.cbY;
-      marble.style.left = x + "px";
-      marble.style.top  = y + "px";
-
-      // 트레이 위로 호버되었을 때 시각적 강조 (clientX/Y 그대로 사용)
-      if (trayState.panel) {
-        const r = trayState.panel.getBoundingClientRect();
-        const inside =
-          e.clientX >= r.left && e.clientX <= r.right &&
-          e.clientY >= r.top  && e.clientY <= r.bottom;
-        trayState.panel.classList.toggle("over", inside);
-      }
-    }
-
-    function onUp(e) {
-      if (!drag || e.pointerId !== drag.pointerId) return;
-      removeMoveListeners();
-
-      if (trayState.panel) trayState.panel.classList.remove("over");
-      const r = trayState.panel.getBoundingClientRect();
-      const inside =
-        e.clientX >= r.left && e.clientX <= r.right &&
-        e.clientY >= r.top  && e.clientY <= r.bottom;
-
-      if (inside) {
-        attemptDrop();
-      } else {
-        snapBack();
-      }
-    }
-
-    function onCancel(e) {
-      if (!drag || e.pointerId !== drag.pointerId) return;
-      removeMoveListeners();
-      snapBack();
-    }
-
-    function removeMoveListeners() {
-      marble.removeEventListener("pointermove", onMove);
-      marble.removeEventListener("pointerup", onUp);
-      marble.removeEventListener("pointercancel", onCancel);
-      try { marble.releasePointerCapture(drag.pointerId); } catch (_) {}
-    }
-
-    function attemptDrop() {
-      const colorName = marble.dataset.colorName;
-      const target = trayState.targetMap.get(colorName);
-
-      // 정답이 아닌 색상
-      if (!target) {
-        sfxWrong();
-        showToast(`${colorName}은(는) 찾는 색이 아니야!`);
-        snapBack(true);
-        return;
-      }
-      // 해당 색이 이미 충분 (실제로는 가용 개수 == 찾을 개수라 거의 발생 안 함)
-      if (trayState.counts[colorName] >= target.count) {
-        sfxWrong();
-        showToast(`${colorName} 구슬은 이미 충분해!`);
-        snapBack(true);
-        return;
-      }
-
-      // 정답 → 접시 슬롯으로 안착
-      sfxPop();
-      placeInTraySlot();
-      trayState.counts[colorName] += 1;
-      refreshTrayCounter(stage, trayState);
-
-      // 모든 조건 충족 검사
-      const allDone = stage.targets.every(t =>
-        (trayState.counts[t.name] || 0) >= t.count
-      );
-      if (allDone) {
-        // 0.3초 후 단계 성공 처리 (마지막 안착 애니메이션이 끝나도록)
-        state.locked = true;
-        setTimeout(() => onStageClear(), 320);
-      }
-    }
-
-    function placeInTraySlot() {
-      // 비어있는 다음 슬롯 찾기
-      const allSlots = trayState.slots.querySelectorAll(".tray-slot");
-      let slot = null;
-      for (const s of allSlots) {
-        if (s.children.length === 0) { slot = s; break; }
-      }
-      if (!slot) slot = trayState.slots; // fallback
-
-      const tr = slot.getBoundingClientRect();
-
-      // 슬롯의 테두리(2px dashed)를 제외한 컨텐츠 박스 사이즈를 정확히 계산.
-      // 이 사이즈가 곧 안착 후 CSS 의 .tray-slot > .marble { width:100% } 값과
-      // 일치하므로, 스냅 종료 시점에 사이즈 점프가 일어나지 않는다.
-      const slotCS = window.getComputedStyle(slot);
-      const bL = parseFloat(slotCS.borderLeftWidth)  || 0;
-      const bR = parseFloat(slotCS.borderRightWidth) || 0;
-      const bT = parseFloat(slotCS.borderTopWidth)   || 0;
-      const bB = parseFloat(slotCS.borderBottomWidth)|| 0;
-      const placedW = Math.max(0, tr.width  - bL - bR);
-      const placedH = Math.max(0, tr.height - bT - bB);
-      const targetX = tr.left + bL + (tr.width  - bL - bR - placedW) / 2;
-      const targetY = tr.top  + bT + (tr.height - bT - bB - placedH) / 2;
-
-      marble.classList.remove("dragging");
-      marble.classList.add("snapping");
-      // 컨테이닝 블록 좌표계로 환산
-      marble.style.left   = (targetX - drag.cbX) + "px";
-      marble.style.top    = (targetY - drag.cbY) + "px";
-      marble.style.width  = placedW + "px";
-      marble.style.height = placedH + "px";
-      marble.style.transform = "scale(1)";
-
-      const settle = () => {
-        // 슬롯에 재배치 + 인라인 스타일 정리. 이후 사이즈는
-        // CSS .tray-slot > .marble { width:100%; height:100% } 가 책임진다.
-        slot.appendChild(marble);
-        marble.classList.remove("snapping");
-        marble.classList.add("placed");
-        marble.style.position = "";
-        marble.style.left = "";
-        marble.style.top = "";
-        marble.style.transform = "";
-        marble.style.width = "";
-        marble.style.height = "";
-        drag = null;
-      };
-      setTimeout(settle, 280);
-    }
-
-    function snapBack(withShake) {
-      if (!drag) return;
-      if (withShake) {
-        marble.classList.add("shake");
-        setTimeout(() => marble.classList.remove("shake"), 420);
-      }
-      marble.classList.remove("dragging");
-      marble.classList.add("snapping");
-      // 컨테이닝 블록 좌표계로 환산
-      marble.style.left = (drag.startX - drag.cbX) + "px";
-      marble.style.top  = (drag.startY - drag.cbY) + "px";
-      marble.style.transform = "scale(1)";
-
-      setTimeout(() => {
-        marble.classList.remove("snapping");
-        marble.style.position = "";
-        marble.style.left = "";
-        marble.style.top = "";
-        marble.style.transform = "";
-        marble.style.width = "";
-        marble.style.height = "";
-        drag = null;
-      }, 280);
     }
   }
 
@@ -826,9 +623,10 @@
     tone(700, 0.04, "triangle", 0.10, 0.04);
   }
 
-  // [9] 따라 해봐! - 색 시퀀스 메모리
-  // 9개 서로 다른 색의 구슬 중 3개가 차례로 빛나며 효과음을 들려주고,
-  // 아이는 같은 순서로 콕콕 누른다. 틀리면 데모를 다시 보여준다.
+  // [6단계] 따라 해봐! - 색 시퀀스 메모리 (24칸 · 5개 시퀀스)
+  // 24개 구슬 중 5개가 차례로 빛나며 효과음을 들려주고, 아이는 같은 순서로
+  // 콕콕 누른다. 데모는 1.5배속으로 재생하고, 끝나면 별도 안내 없이 바로
+  // 따라할 수 있다. 우측 상단 '다시 보여줘' 버튼으로 데모를 재생할 수 있다.
   const SIMON_TONES = [
     261.63, 311.13, 349.23, 392.00, 440.00,
     466.16, 523.25, 587.33, 659.25,
@@ -851,6 +649,18 @@
       gridEl.appendChild(m);
     }
 
+    // 우측 상단 '다시 보여줘' 버튼
+    const replay = document.createElement("button");
+    replay.id = "replay-btn";
+    replay.type = "button";
+    replay.className = "replay-btn";
+    replay.textContent = "다시 보여줘 🔁";
+    replay.addEventListener("click", () => {
+      if (simonState.demoBusy) return;
+      playSimonDemo(simonState);
+    });
+    marbleArea.appendChild(replay);
+
     // 짧은 지연 후 데모 시작 (그리드 레이아웃이 안정된 뒤)
     setTimeout(() => playSimonDemo(simonState), 500);
   }
@@ -860,28 +670,27 @@
     simonState.demoBusy = true;
     simonState.progress = 0;
 
-    await showBanner("잘 봐!", "구슬이 빛나는 순서를 기억하자~", 1400);
+    await showBanner("잘 봐!", "잘 보고 똑같이 따라해봐~", 1400);
 
     for (let i = 0; i < simonState.sequence.length; i++) {
       const idx = simonState.sequence[i];
       await pulseMarbleDemo(simonState.marbles[idx]);
     }
 
-    await showBanner("이제 따라해봐!", "순서대로 콕콕 눌러보자!", 1400);
-
+    // 데모 종료 → 별도 안내 팝업 없이 바로 따라할 수 있게 입력 잠금 해제
     state.locked = false;
     simonState.demoBusy = false;
   }
 
   async function pulseMarbleDemo(m) {
-    // 5~6세 아이가 따라가기에 충분한 속도로 1.5배 늘려둠.
+    // 기존 대비 1.5배속(재생 시간 ÷ 1.5)으로 더 빠르게 재생.
     const idx = parseInt(m.dataset.idx) || 0;
     const freq = SIMON_TONES[idx % SIMON_TONES.length];
-    tone(freq, 0.63, "triangle", 0.24, 0);
+    tone(freq, 0.42, "triangle", 0.24, 0);
     m.classList.add("simon-light");
-    await sleep(720);
+    await sleep(480);
     m.classList.remove("simon-light");
-    await sleep(300);
+    await sleep(200);
   }
 
   function pulseMarbleHit(m) {

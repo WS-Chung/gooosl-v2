@@ -138,6 +138,25 @@
     place-items: center;
     overflow: hidden;
   }
+  /* 6단계 '따라 해봐!' 의 '다시 보여줘' 버튼 (우측 상단) */
+  .replay-btn {
+    position: absolute;
+    top: 8px;
+    right: 10px;
+    z-index: 6;
+    border: none;
+    cursor: pointer;
+    font-family: 'Jua', 'Gaegu', sans-serif;
+    font-size: clamp(14px, 1.8vw, 20px);
+    color: #7a4a86;
+    padding: 8px 16px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, .85);
+    box-shadow: 0 4px 12px rgba(150, 110, 175, .28);
+    transition: transform .12s ease, box-shadow .12s ease;
+  }
+  .replay-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(150, 110, 175, .38); }
+  .replay-btn:active { transform: scale(.94); }
   .marble-grid {
     display: grid;
     gap: clamp(10px, 1.6vw, 22px);

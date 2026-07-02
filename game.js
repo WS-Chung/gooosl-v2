@@ -67,6 +67,19 @@
   function sfxStageClear() {
     [523, 659, 784, 1046].forEach((f, i) => tone(f, 0.18, "triangle", 0.22, i * 0.10));
   }
+  // 여러 구슬이 '동시에' 터지는 풍선/폭죽 소리 ("파파팡!")
+  function sfxBurst(count) {
+    const n = Math.min(Math.max(count || 2, 2), 6);
+    // 거의 동시(≤36ms)의 팝들을 겹쳐 풍성한 '팡' — 지각적으로 하나의 터짐
+    for (let i = 0; i < n; i++) {
+      const off = i * 0.006;
+      tone(680 + Math.random() * 520, 0.10, "triangle", 0.15, off);
+      tone(1200 + Math.random() * 650, 0.08, "triangle", 0.11, off + 0.02);
+    }
+    // 저역 '펑' 바디 + 반짝이는 꼬리
+    tone(170, 0.16, "sine", 0.20, 0);
+    tone(1760, 0.14, "sine", 0.09, 0.05);
+  }
   function sfxFinal() {
     [523, 659, 784, 1046, 1318, 1568].forEach((f, i) => tone(f, 0.20, "triangle", 0.22, i * 0.12));
   }
@@ -431,27 +444,23 @@
       return;
     }
 
-    // 정답 색 → 같은 색 구슬 전체를 한꺼번에 파파팍 터뜨림 (아무거나 눌러도 OK)
+    // 정답 색 → 같은 색 구슬 전체를 '동시에' 터뜨림 + 풍선/폭죽 터지는 소리
     state.locked = true;
     const group = Array.from(gridEl.querySelectorAll(".marble"))
       .filter((x) => x.dataset.color === subState.targetColor && !x.disabled);
-    group.forEach((g, i) => {
-      // 55ms 씩 시차를 줘 '파파팍' 느낌
-      setTimeout(() => { pop(g); sfxPop(); }, i * 55);
-    });
-    const burstMs = group.length * 55 + 220;
+    group.forEach((g) => pop(g)); // 6개(또는 2개)가 동시에 팡!
+    sfxBurst(group.length);
 
     if (subState.step === 0) {
       // 세부 2단계(가장 적은 색)로 전환
       subState.step = 1;
       showToast("잘했어! 이번엔 가장 조금 있는 색이야~");
-      setTimeout(() => sfxStageClear(), burstMs);
       setTimeout(() => {
         state.locked = false;
         startMostStep(stage, subState);
-      }, Math.max(900, burstMs + 200));
+      }, 900);
     } else {
-      setTimeout(() => onStageClear(), Math.max(400, burstMs));
+      setTimeout(() => onStageClear(), 520);
     }
   }
 
@@ -856,24 +865,26 @@
     gridEl.style.flexDirection = "column";
     gridEl.style.justifyContent = "center";
     gridEl.style.alignItems = "center";
-    gridEl.style.gap = "clamp(20px, 4vh, 44px)";
+    // 문항 ↔ 정답지 사이 간격을 넉넉히
+    gridEl.style.gap = "clamp(34px, 8vh, 84px)";
 
     instructionEl.innerHTML =
-      `<span>규칙을 보고 <span class="accent">다음에 나올 구슬</span>을 골라봐! ` +
+      `<span><span class="accent">${quiz.len}번째</span> 구슬은 무슨 색일까? ` +
       `<span class="pattern-step">${quizState.step + 1} / ${stage.quizzes.length}</span></span>`;
 
-    // 시퀀스 행: 색 구슬들 + 마지막 '?'(무채색)
+    // 시퀀스 행: 번호가 붙은 색 구슬들(1~len-1) + 마지막 len번 무채색 정답칸
     const seqRow = document.createElement("div");
     seqRow.className = "pattern-row";
-    quiz.sequence.forEach((color) => {
+    quiz.sequence.forEach((color, i) => {
       const cell = document.createElement("div");
       cell.className = "marble pattern-cell";
       cell.style.setProperty("--hue", color);
+      cell.textContent = String(i + 1);
       seqRow.appendChild(cell);
     });
     const unknown = document.createElement("div");
     unknown.className = "marble pattern-cell pattern-unknown";
-    unknown.textContent = "?";
+    unknown.textContent = String(quiz.len); // 9 또는 10번
     seqRow.appendChild(unknown);
     gridEl.appendChild(seqRow);
 
@@ -900,12 +911,11 @@
       return;
     }
 
-    // 정답 → '?' 자리를 정답 색으로 공개
+    // 정답 → 무채색 정답칸을 정답 색으로 공개 (번호는 그대로 유지)
     sfxPop();
     state.locked = true;
     const color = c.style.getPropertyValue("--hue");
     unknownCell.classList.remove("pattern-unknown");
-    unknownCell.textContent = "";
     unknownCell.style.setProperty("--hue", color);
     unknownCell.classList.add("reveal-pulse");
     setTimeout(() => unknownCell.classList.remove("reveal-pulse"), 280);

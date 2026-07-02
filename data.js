@@ -394,30 +394,33 @@
   // 로 갈수록 어려워진다. 색은 대비가 뚜렷한 빨주노초파보 6색에서 매번 무작위.
   function generateStage13() {
     const palette = Object.keys(MISSION_COLORS); // 빨·주·노·초·파·보 hex 6개
-    function makeQuiz(patternUnit, numColors, shownCount) {
+    // 문항 길이 len(9~10). 1~(len-1)번은 규칙적 색 구슬, len번(마지막)이 무채색 정답칸.
+    function makeQuiz(patternUnit, numColors) {
+      const len = randint(9, 10);
+      const period = patternUnit.length;
       const cols = sample(palette, numColors); // 서로 다른 색
-      const sequence = [];
-      for (let i = 0; i < shownCount; i++) {
-        sequence.push(cols[patternUnit[i % patternUnit.length]]);
+      const sequence = []; // 1~(len-1)번 구슬 색
+      for (let i = 0; i < len - 1; i++) {
+        sequence.push(cols[patternUnit[i % period]]);
       }
-      const answer_color = cols[patternUnit[shownCount % patternUnit.length]];
+      const answer_color = cols[patternUnit[(len - 1) % period]]; // len번 구슬 정답 색
       // 보기 3개: 정답 + 패턴에 등장한 색 우선, 부족하면 다른 색으로 채움
       const choices = [];
       const push = (c) => { if (choices.indexOf(c) < 0 && choices.length < 3) choices.push(c); };
       push(answer_color);
       cols.forEach(push);
       shuffle(palette).forEach(push);
-      return { sequence: sequence, answer_color: answer_color, choices: shuffle(choices) };
+      return { len: len, sequence: sequence, answer_color: answer_color, choices: shuffle(choices) };
     }
     return {
       id: 13,
       title: "다음에 나올 구슬은?",
       instruction: "",
-      count: 6, // 커스텀 렌더 (setupGrid 안전값)
+      count: 10, // 커스텀 렌더 (setupGrid 안전값)
       quizzes: [
-        makeQuiz([0, 1], 2, 5),    // 서브1: A B A B A ? → B (주기2, 쉬움)
-        makeQuiz([0, 0, 1], 2, 5), // 서브2: A A B A A ? → B (주기3, 보통)
-        makeQuiz([0, 1, 2], 3, 5), // 서브3: A B C A B ? → C (주기3, 어려움)
+        makeQuiz([0, 1], 2),    // 서브1: A B A B … (주기2, 쉬움)
+        makeQuiz([0, 0, 1], 2), // 서브2: A A B A A B … (주기3, 보통)
+        makeQuiz([0, 1, 2], 3), // 서브3: A B C A B C … (주기3, 어려움)
       ],
       targets_total: 0,
     };

@@ -203,7 +203,7 @@
     align-items: center;
     justify-content: center;
     gap: clamp(6px, 1.4vw, 16px);
-    flex-wrap: nowrap;
+    flex-wrap: wrap;      /* 문항이 9~10개로 길어 좁은 화면에선 줄바꿈 */
     max-width: 100%;
   }
   .pattern-choices {
@@ -212,19 +212,22 @@
     justify-content: center;
     gap: clamp(16px, 3.5vw, 42px);
   }
+  /* 문항 구슬: 크게 (번호 표시) */
   .marble.pattern-cell {
-    --size: clamp(38px, 7.4vw, 70px);
+    --size: clamp(46px, 7.6vw, 82px);
     animation: none; /* 시퀀스는 흔들리지 않게 고정 */
     cursor: default;
+    font-size: calc(var(--size) * 0.4);
   }
   .marble.pattern-unknown {
     --hue: #d9d9e3;
     color: #7d7d8c;
     font-weight: 800;
-    font-size: calc(var(--size) * 0.5);
   }
+  /* 정답지(보기) 구슬: 상대적으로 작게 */
   .marble.pattern-choice {
-    --size: clamp(56px, 11vw, 94px);
+    --size: clamp(40px, 5.6vw, 62px);
+    cursor: pointer;
   }
   .marble.pattern-choice.pattern-picked {
     outline: 4px solid #ffd166;

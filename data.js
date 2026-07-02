@@ -185,33 +185,28 @@
   }
 
   // [3단계·신규] 가장 많이 있는 구슬 찾기
-  // 24개를 6색으로 분배: 최다 7개, 최소 2개, 나머지 [4,4,4,3] → [7,4,4,4,3,2] = 24.
-  // 최다(7)를 도드라지게 해 한눈에 잘 보이도록 했다. 먼저 "가장 많은" 색을 모두
-  // 없애고, 이어서 "가장 적은" 색을 모두 없애는 2단계 세부 문제로 구성된다.
+  // 24개를 5색으로 분배: 분포 [8,5,5,4,2] = 24. 최다(8)를 도드라지게 해 한눈에 잘
+  // 보이도록 했다. 먼저 "가장 많은" 색을 모두 없애고, 이어서 "가장 적은" 색을 모두
+  // 없애는 2단계 세부 문제로 구성된다.
   function generateStage11() {
     const count = 24;
-    const numColors = 6;
-    // 대비가 뚜렷한 빨·주·노·초·파·보 6색만 사용 (MISSION_COLORS = 정확히 이 6색)
-    const chosen = shuffle(Object.entries(MISSION_COLORS)); // [hex, name] tuple 6개
-    // 최다(7)·최소(2)·중간저(3) 색을 서로 다르게 무작위 지정, 나머지 3색은 4개씩
-    const order = shuffle(range(numColors));
-    const mostColorIdx = order[0];
-    const leastColorIdx = order[1];
-    const thirdColorIdx = order[2]; // 3개짜리 디스트랙터
-
-    const counts = [];
-    for (let i = 0; i < numColors; i++) {
-      if (i === mostColorIdx) counts.push(7);
-      else if (i === leastColorIdx) counts.push(2);
-      else if (i === thirdColorIdx) counts.push(3);
-      else counts.push(4);
-    }
+    const numColors = 5;
+    // 대비가 뚜렷한 빨·주·노·초·파·보 6색 중 5색 사용
+    const chosen = sample(Object.entries(MISSION_COLORS), numColors); // [hex, name] tuple 5개
+    // 색 ↔ 개수 무작위 대응 (분포 [8,5,5,4,2])
+    const template = [8, 5, 5, 4, 2];
+    const perm = shuffle(range(numColors));
+    const counts = new Array(numColors);
+    perm.forEach((colorIdx, k) => { counts[colorIdx] = template[k]; });
 
     const colorList = [];
     for (let i = 0; i < numColors; i++) {
       for (let k = 0; k < counts[i]; k++) colorList.push(chosen[i][0]);
     }
     const colors = shuffle(colorList);
+
+    const mostColorIdx = counts.indexOf(8);   // 최다
+    const leastColorIdx = counts.indexOf(2);  // 최소
 
     return {
       id: 11,
@@ -221,7 +216,7 @@
       colors: colors,
       most_color: chosen[mostColorIdx][0],
       most_name: chosen[mostColorIdx][1],
-      most_count: 7,
+      most_count: 8,
       least_color: chosen[leastColorIdx][0],
       least_name: chosen[leastColorIdx][1],
       least_count: 2,
@@ -322,12 +317,12 @@
     };
   }
 
-  // [6단계] 따라 해봐! (16칸 · 4×4 · 5개 시퀀스)
-  // 색은 장식(위치 index 로 식별)이라 무지개에서 반복 추출. 빛나는 순서 5개를
+  // [6단계] 따라 해봐! (16칸 · 4×4 · 4개 시퀀스)
+  // 색은 장식(위치 index 로 식별)이라 무지개에서 반복 추출. 빛나는 순서 4개를
   // 데모로 보여준 뒤 아이가 그대로 따라 누른다.
   function generateStage9Simon() {
     const count = 16;
-    const sequence_len = 5;
+    const sequence_len = 4;
     const colors = [];
     for (let i = 0; i < count; i++) colors.push(choice(RAINBOW_HEXES));
     const sequence = sample(range(count), sequence_len);
@@ -366,10 +361,12 @@
   // 세부1: 대문자 제시 → 소문자 12개 중 같은 알파벳 찾기
   // 세부2: 소문자 제시 → 대문자 12개 중 같은 알파벳 찾기
   // 색은 장식(글자로 식별)이라 무지개에서 반복 추출.
+  // 대·소문자 모양이 같은 c·o·s·v·x·z 는 제외(2,14,18,21,23,25).
+  const ALPHA_POOL = range(26).filter((i) => [2, 14, 18, 21, 23, 25].indexOf(i) < 0);
   function generateStage12() {
     const count = 12;
     function makeSub(promptCase) {
-      const letterIdxs = sample(range(26), count); // 0=A … 25=Z, 12개 서로 다른 글자
+      const letterIdxs = sample(ALPHA_POOL, count); // 모양이 다른 알파벳 20자 중 12개
       const targetIdx = choice(letterIdxs);
       const colors = [];
       for (let i = 0; i < count; i++) colors.push(choice(RAINBOW_HEXES));

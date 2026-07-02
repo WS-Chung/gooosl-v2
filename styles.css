@@ -438,6 +438,23 @@
     100% { transform: scale(1); }
   }
 
+  /* 7단계 미리보기: 정답 쌍을 매초 한 쌍씩 순차 하이라이트 */
+  .marble.pair-flash {
+    animation: pair-flash 1s ease-in-out !important;
+    z-index: 4;
+  }
+  @keyframes pair-flash {
+    0%, 100% { transform: scale(1); }
+    35%, 65% {
+      transform: scale(1.16);
+      box-shadow:
+        0 0 0 5px rgba(255, 255, 255, .8),
+        0 0 30px 10px rgba(255, 210, 90, .9),
+        0 12px 24px rgba(80, 40, 90, .3);
+      filter: brightness(1.2) saturate(1.15);
+    }
+  }
+
   /* 9단계: 따라 해봐! - 데모/정답 시 빛나는 상태 */
   .marble.simon-light {
     animation: none !important;

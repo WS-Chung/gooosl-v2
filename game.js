@@ -358,9 +358,8 @@
       state.locked = true;
       setTimeout(() => onStageClear(), 320);
     } else {
-      // 다음 회차로: 잠깐 축하 후 새 불이 다시 켜짐 (자연스럽게 반복)
+      // 다음 회차로: 짧은 축하음 후 새 불이 다시 켜짐 (별도 안내 팝업 없이 자연스럽게 반복)
       state.locked = true;
-      showToast("잘했어! 또 반짝이는 구슬이 나타났어~");
       sfxStageClear();
       setTimeout(() => {
         state.locked = false;
@@ -509,14 +508,14 @@
   }
 
   // [8] 똑같은 짝꿍 찾기 - 뒤집어서 같은 색 짝 맞히기
-  // 진입 시 5초간 모든 마블의 색을 보여주고(미리보기), 카운트다운 종료 시점에
-  // 모든 마블을 회색 face-down 상태로 전환한 뒤 본 게임을 시작한다.
+  // 진입 시 8초간 모든 마블의 색을 보여주고(미리보기), 카운트다운이 매초 바뀔 때마다
+  // 정답 쌍을 한 쌍씩 순차 하이라이트한다. 종료 시점에 모두 회색 face-down 으로 전환.
   function renderStage8(stage) {
     const memState = {
       flipped: [],                  // 현재 뒤집힌 마블 0~2개
       pairsLeft: stage.pairs_count, // 남은 짝 개수
       busy: false,                  // 비교 대기 중 잠금
-      previewing: true,             // 10초 미리보기 단계
+      previewing: true,             // 8초 미리보기 단계
       wrongStreak: 0,               // 연속 오답 횟수 (힌트 점등 트리거)
       hinted: null,                 // 현재 ✨로 힌트 중인 마블
     };
@@ -525,7 +524,7 @@
       const color = stage.colors[i];
       const m = makeMarble({ aria: "비밀 구슬" });
       // 미리보기 동안에는 색을 인라인으로 부여해서 그대로 노출.
-      // 5초 후 인라인 --hue 를 제거하면 .face-down 클래스의 흰색이 적용된다.
+      // 종료 시 인라인 --hue 를 제거하면 .face-down 클래스의 흰색이 적용된다.
       m.style.setProperty("--hue", color);
       m.dataset.color = color;
       m.dataset.idx = i;
@@ -533,8 +532,8 @@
       gridEl.appendChild(m);
     }
 
-    // 카운트다운 + 회색 전환 (비동기 fire-and-forget)
-    startMemoryPreview(memState, stage, 10);
+    // 카운트다운 + 순차 하이라이트 + 회색 전환 (비동기 fire-and-forget)
+    startMemoryPreview(memState, stage, 8);
   }
 
   async function startMemoryPreview(memState, stage, seconds) {
@@ -542,11 +541,29 @@
     state.locked = true;
     memState.previewing = true;
 
-    for (let s = seconds; s >= 1; s--) {
+    // 색상별 마블 쌍 목록 (무작위 순서) — 매초 한 쌍씩 하이라이트
+    const byColor = new Map();
+    gridEl.querySelectorAll(".marble").forEach((m) => {
+      const c = m.dataset.color;
+      if (!byColor.has(c)) byColor.set(c, []);
+      byColor.get(c).push(m);
+    });
+    const pairOrder = shuffle(Array.from(byColor.values()));
+
+    let prevPair = null;
+    for (let i = 0, s = seconds; s >= 1; s--, i++) {
       showMemoryCountdown(s);
       sfxTick();
+      // 이전 쌍 하이라이트 해제 후 이번 쌍 하이라이트
+      if (prevPair) prevPair.forEach((m) => m.classList.remove("pair-flash"));
+      const cur = pairOrder[i];
+      if (cur) {
+        cur.forEach((m) => m.classList.add("pair-flash"));
+        prevPair = cur;
+      }
       await sleep(1000);
     }
+    if (prevPair) prevPair.forEach((m) => m.classList.remove("pair-flash"));
 
     // 모든 마블을 회색 face-down 으로 전환 + 가벼운 펄스로 시각적 신호
     sfxFlip();

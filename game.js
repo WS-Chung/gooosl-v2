@@ -17,7 +17,6 @@
 
   const stageTitleEl  = $("#stage-title");
   const instructionEl = $("#instruction");
-  const stagePillEl   = $("#stage-pill");
   const dotsEl        = $("#progress-dots");
   const gridEl        = $("#marble-grid");
   const marbleArea    = $(".marble-area");
@@ -134,7 +133,6 @@
       d.className = "d" + (i < stageIdx ? " done" : (i === stageIdx ? " now" : ""));
       dotsEl.appendChild(d);
     }
-    stagePillEl.textContent = `${stageIdx + 1}단계 / ${stages.length}`;
   }
 
   function showToast(text) {
@@ -251,6 +249,8 @@
     else if (stage.id === 8) renderStage8(stage);
     else if (stage.id === 9) renderStage9(stage);
     else if (stage.id === 10) renderStage10(stage);
+    else if (stage.id === 12) renderStage12(stage);
+    else if (stage.id === 13) renderStage13(stage);
   }
 
   function makeMarble(opts = {}) {
@@ -400,10 +400,10 @@
   }
 
   // [3단계·신규] 가장 많이 / 가장 적게 있는 색 찾기
-  // 세부 1단계: 가장 많은(5개) 색을 모두 터뜨림 → 세부 2단계: 가장 적은(3개) 색을
-  // 모두 터뜨림. 두 세부 단계를 마치면 단계 성공.
+  // 세부 1단계: 가장 많은(6개) 색 중 아무거나 클릭 → 6개가 한꺼번에 파파팍 터짐.
+  // 세부 2단계: 가장 적은(2개) 색 중 아무거나 클릭 → 2개가 파팍 터짐. 둘 다 완료 시 성공.
   function renderStage11(stage) {
-    const subState = { step: 0, remaining: 0, targetColor: null };
+    const subState = { step: 0, targetColor: null };
     for (let i = 0; i < stage.count; i++) {
       const m = makeMarble({ color: stage.colors[i], aria: "구슬" });
       m.dataset.color = stage.colors[i];
@@ -416,7 +416,6 @@
   function startMostStep(stage, subState) {
     const isMost = (subState.step === 0);
     subState.targetColor = isMost ? stage.most_color : stage.least_color;
-    subState.remaining   = isMost ? stage.most_count : stage.least_count;
     instructionEl.innerHTML = isMost
       ? "가장 <span class=\"accent\">많이</span> 있는 색깔을 찾아서 없애봐!"
       : "이번엔 가장 <span class=\"accent\">조금</span> 있는 색깔을 찾아서 없애봐!";
@@ -432,24 +431,27 @@
       return;
     }
 
-    sfxPop();
-    pop(m);
-    subState.remaining -= 1;
-    if (subState.remaining > 0) return;
+    // 정답 색 → 같은 색 구슬 전체를 한꺼번에 파파팍 터뜨림 (아무거나 눌러도 OK)
+    state.locked = true;
+    const group = Array.from(gridEl.querySelectorAll(".marble"))
+      .filter((x) => x.dataset.color === subState.targetColor && !x.disabled);
+    group.forEach((g, i) => {
+      // 55ms 씩 시차를 줘 '파파팍' 느낌
+      setTimeout(() => { pop(g); sfxPop(); }, i * 55);
+    });
+    const burstMs = group.length * 55 + 220;
 
     if (subState.step === 0) {
       // 세부 2단계(가장 적은 색)로 전환
       subState.step = 1;
-      state.locked = true;
       showToast("잘했어! 이번엔 가장 조금 있는 색이야~");
-      sfxStageClear();
+      setTimeout(() => sfxStageClear(), burstMs);
       setTimeout(() => {
         state.locked = false;
         startMostStep(stage, subState);
-      }, 900);
+      }, Math.max(900, burstMs + 200));
     } else {
-      state.locked = true;
-      setTimeout(() => onStageClear(), 320);
+      setTimeout(() => onStageClear(), Math.max(400, burstMs));
     }
   }
 
@@ -659,7 +661,9 @@
       if (simonState.demoBusy) return;
       playSimonDemo(simonState);
     });
-    marbleArea.appendChild(replay);
+    // marble-area 는 overflow:hidden 이라 버튼이 구슬을 가리므로, 카드(.stage-wrap)
+    // 상단 우측에 붙여 그리드 위쪽에 띄운다.
+    document.querySelector(".stage-wrap").appendChild(replay);
 
     // 짧은 지연 후 데모 시작 (그리드 레이아웃이 안정된 뒤)
     setTimeout(() => playSimonDemo(simonState), 500);
@@ -779,6 +783,148 @@
     }
   }
 
+  // [9단계] 알파벳 맞추기 (대문자 ↔ 소문자 매칭)
+  // 세부1: 대문자 제시 → 소문자 12개 중 같은 글자 찾기
+  // 세부2: 소문자 제시 → 대문자 12개 중 같은 글자 찾기
+  function renderStage12(stage) {
+    const subState = { step: 0 };
+    renderAlphaSub(stage, subState);
+  }
+
+  function renderAlphaSub(stage, subState) {
+    const sub = stage.subs[subState.step];
+    const upperPrompt = (sub.promptCase === "upper");
+    const UPPER = 65, LOWER = 97; // 'A', 'a'
+    const promptChar = String.fromCharCode((upperPrompt ? UPPER : LOWER) + sub.targetIdx);
+    // 마블에 표시되는 글자는 프롬프트의 반대 케이스
+    const marbleBase = upperPrompt ? LOWER : UPPER;
+
+    clearGrid();
+    setupGrid(stage.count, stage.cols); // cols 미지정 → colsFor(12)
+    instructionEl.innerHTML =
+      `<span>이 알파벳과 <span class="accent">같은 글자</span>를 찾아봐!</span>` +
+      `<span class="alpha-prompt">${promptChar}</span>`;
+
+    for (let i = 0; i < stage.count; i++) {
+      const letterIdx = sub.letterIdxs[i];
+      const ch = String.fromCharCode(marbleBase + letterIdx);
+      const m = makeMarble({ color: sub.colors[i], text: ch, aria: "알파벳 " + ch });
+      const isAnswer = (letterIdx === sub.targetIdx);
+      m.addEventListener("click", () => onAlphaClick(m, isAnswer, stage, subState));
+      gridEl.appendChild(m);
+    }
+  }
+
+  function onAlphaClick(m, isAnswer, stage, subState) {
+    if (state.locked) return;
+    if (m.disabled) return;
+    if (!isAnswer) {
+      shake(m);
+      showToast(randomEncourage());
+      sfxWrong();
+      return;
+    }
+
+    sfxPop();
+    pop(m);
+    state.locked = true;
+    if (subState.step === 0) {
+      // 세부 2단계(소문자 제시 → 대문자 찾기)로 전환
+      subState.step = 1;
+      showToast("잘했어! 이번엔 반대로 찾아보자~");
+      sfxStageClear();
+      setTimeout(() => {
+        state.locked = false;
+        renderAlphaSub(stage, subState);
+      }, 1000);
+    } else {
+      setTimeout(() => onStageClear(), 340);
+    }
+  }
+
+  // [10단계] 다음에 나올 구슬 맞추기 (규칙성 있는 색 패턴 예측, 3서브 퀴즈)
+  function renderStage13(stage) {
+    const quizState = { step: 0 };
+    renderPatternQuiz(stage, quizState);
+  }
+
+  function renderPatternQuiz(stage, quizState) {
+    const quiz = stage.quizzes[quizState.step];
+    clearGrid();
+    // 커스텀 세로 레이아웃 (그리드 대신 flex). 시퀀스 행 + 보기 행.
+    gridEl.style.display = "flex";
+    gridEl.style.flexDirection = "column";
+    gridEl.style.justifyContent = "center";
+    gridEl.style.alignItems = "center";
+    gridEl.style.gap = "clamp(20px, 4vh, 44px)";
+
+    instructionEl.innerHTML =
+      `<span>규칙을 보고 <span class="accent">다음에 나올 구슬</span>을 골라봐! ` +
+      `<span class="pattern-step">${quizState.step + 1} / ${stage.quizzes.length}</span></span>`;
+
+    // 시퀀스 행: 색 구슬들 + 마지막 '?'(무채색)
+    const seqRow = document.createElement("div");
+    seqRow.className = "pattern-row";
+    quiz.sequence.forEach((color) => {
+      const cell = document.createElement("div");
+      cell.className = "marble pattern-cell";
+      cell.style.setProperty("--hue", color);
+      seqRow.appendChild(cell);
+    });
+    const unknown = document.createElement("div");
+    unknown.className = "marble pattern-cell pattern-unknown";
+    unknown.textContent = "?";
+    seqRow.appendChild(unknown);
+    gridEl.appendChild(seqRow);
+
+    // 보기 행: 클릭 가능한 구슬 3개
+    const choiceRow = document.createElement("div");
+    choiceRow.className = "pattern-choices";
+    quiz.choices.forEach((color) => {
+      const c = makeMarble({ color: color, aria: "보기 구슬" });
+      c.classList.add("pattern-choice");
+      const isAnswer = (color === quiz.answer_color);
+      c.addEventListener("click", () => onPatternClick(c, isAnswer, unknown, stage, quizState));
+      choiceRow.appendChild(c);
+    });
+    gridEl.appendChild(choiceRow);
+  }
+
+  function onPatternClick(c, isAnswer, unknownCell, stage, quizState) {
+    if (state.locked) return;
+    if (c.disabled) return;
+    if (!isAnswer) {
+      shake(c);
+      showToast(randomEncourage());
+      sfxWrong();
+      return;
+    }
+
+    // 정답 → '?' 자리를 정답 색으로 공개
+    sfxPop();
+    state.locked = true;
+    const color = c.style.getPropertyValue("--hue");
+    unknownCell.classList.remove("pattern-unknown");
+    unknownCell.textContent = "";
+    unknownCell.style.setProperty("--hue", color);
+    unknownCell.classList.add("reveal-pulse");
+    setTimeout(() => unknownCell.classList.remove("reveal-pulse"), 280);
+    c.classList.add("pattern-picked");
+
+    const next = quizState.step + 1;
+    if (next >= stage.quizzes.length) {
+      setTimeout(() => onStageClear(), 900);
+    } else {
+      showToast("정답이야! 다음 문제~");
+      sfxStageClear();
+      setTimeout(() => {
+        state.locked = false;
+        quizState.step = next;
+        renderPatternQuiz(stage, quizState);
+      }, 1100);
+    }
+  }
+
   // -------------------------------------------------------------------
   // 클릭 처리
   // -------------------------------------------------------------------
@@ -854,38 +1000,86 @@
   // 단계 성공 / 최종 성공
   // -------------------------------------------------------------------
   async function onStageClear() {
-    // 마지막 단계(10단계)는 짧은 환호 소리로 마무리. 그 외 단계는 기존 상승 코드.
-    // 10단계는 onClick 측에서 700ms 딜레이를 두고 호출하므로 마지막 음과
-    // 환호가 겹치지 않는다.
-    const isLastStage = (state.current_stage + 1 >= stages.length);
-    if (isLastStage) {
+    const cur = stages[state.current_stage];
+    const next = state.current_stage + 1;
+    const isLastStage = (next >= stages.length);
+
+    // 스테이지별 특수 성공 이펙트
+    if (cur.id === 10) {
+      // 한글 기차: 환호 → 진짜 기차가 화면을 가로지름
+      // (10단계는 onClick 이 마지막 음 뒤 700ms 딜레이로 호출하므로 겹치지 않음)
       sfxCheer();
-    } else {
+      await sleep(CHEER_MS + CHEER_TO_TRAIN_GAP);
+      await playTrain(cur);
+    } else if (cur.id === 12) {
+      // 알파벳 맞추기: 환호 → 알파벳이 사방으로 터지는 폭죽
+      sfxCheer();
+      await playAlphabetFireworks();
+    } else if (!isLastStage) {
       sfxStageClear();
     }
-    const next = state.current_stage + 1;
-    if (next >= stages.length) {
-      finalClear();
+    // 마지막 단계(특수 이펙트 없음)는 아래 최종 카드에서 sfxFinal 로 마무리
+
+    if (isLastStage) {
+      // 마지막 단계 완주 → 최종 성공 카드 + 캔버스 폭죽
+      sfxFinal();
+      updateProgress(stages.length); // 모두 done
+      finalEl.classList.add("show");
+      startFireworks();
       return;
     }
+
     await showBanner(`${state.current_stage + 1}단계 성공!`, pickClearMsg(), 1800);
     state.current_stage = next;
     updateProgress(state.current_stage);
     renderStage(stages[state.current_stage]);
   }
 
-  async function finalClear() {
-    // 마지막 스테이지(현재 10단계: 한글 기차)를 성공하면 진짜 기차가
-    // 화면을 가로지른 뒤 폭죽 + 성공 카드가 등장한다.
-    // 환호는 onStageClear 에서 이미 시작됐으므로, 환호가 다 끝나고
-    // 짧은 침묵 구간을 둔 뒤에 기차 사운드가 자연스럽게 이어지도록 기다린다.
-    await sleep(CHEER_MS + CHEER_TO_TRAIN_GAP);
-    const lastStage = stages[stages.length - 1];
-    await playTrain(lastStage);
-    sfxFinal();
-    updateProgress(stages.length); // 모두 done
-    finalEl.classList.add("show");
-    startFireworks();
+  // -------------------------------------------------------------------
+  // 알파벳 폭죽 (9단계 성공 보상): 알파벳 글자들이 사방으로 터져 나감
+  // -------------------------------------------------------------------
+  function playAlphabetFireworks() {
+    return new Promise((resolve) => {
+      const overlay = document.createElement("div");
+      overlay.className = "alpha-overlay";
+      document.body.appendChild(overlay);
+
+      const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+      const COLORS = ["#E53935","#FB8C00","#FDD835","#43A047","#1E88E5","#8E24AA","#ff6fa5","#00b894"];
+      const waves = 4;
+
+      function spawnBurst() {
+        const cx = window.innerWidth  * (0.25 + Math.random() * 0.5);
+        const cy = window.innerHeight * (0.25 + Math.random() * 0.35);
+        const n = 22;
+        // 폭죽 팡! 소리
+        sfxPop();
+        tone(1200 + Math.random() * 400, 0.18, "triangle", 0.12, 0);
+        for (let i = 0; i < n; i++) {
+          const el = document.createElement("span");
+          el.className = "alpha-particle";
+          el.textContent = LETTERS[Math.floor(Math.random() * LETTERS.length)];
+          el.style.color = COLORS[Math.floor(Math.random() * COLORS.length)];
+          el.style.left = cx + "px";
+          el.style.top  = cy + "px";
+          overlay.appendChild(el);
+          const ang  = (Math.PI * 2 * i) / n + Math.random() * 0.4;
+          const dist = 140 + Math.random() * 280;
+          const dx = Math.cos(ang) * dist;
+          const dy = Math.sin(ang) * dist - 40; // 살짝 위로 솟았다가
+          const rot = Math.random() * 720 - 360;
+          const scl = 0.6 + Math.random() * 1.3;
+          requestAnimationFrame(() => {
+            el.style.transform = `translate(${dx}px, ${dy + 90}px) rotate(${rot}deg) scale(${scl})`;
+            el.style.opacity = "0";
+          });
+          setTimeout(() => el.remove(), 1700);
+        }
+      }
+
+      for (let w = 0; w < waves; w++) setTimeout(spawnBurst, w * 420);
+      setTimeout(() => { overlay.remove(); resolve(); }, waves * 420 + 1500);
+    });
   }
 
   // -------------------------------------------------------------------

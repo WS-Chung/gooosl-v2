@@ -138,11 +138,11 @@
     place-items: center;
     overflow: hidden;
   }
-  /* 6단계 '따라 해봐!' 의 '다시 보여줘' 버튼 (우측 상단) */
+  /* 6단계 '따라 해봐!' 의 '다시 보여줘' 버튼 (진행 점 아래, 그리드 위쪽 우측) */
   .replay-btn {
     position: absolute;
-    top: 8px;
-    right: 10px;
+    top: 58px;
+    right: 20px;
     z-index: 6;
     border: none;
     cursor: pointer;
@@ -157,6 +157,90 @@
   }
   .replay-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(150, 110, 175, .38); }
   .replay-btn:active { transform: scale(.94); }
+
+  /* 9단계 알파벳 맞추기: 제시 글자 강조 배지 */
+  .instruction .alpha-prompt {
+    display: inline-grid;
+    place-items: center;
+    min-width: clamp(44px, 5vw, 66px);
+    height: clamp(44px, 5vw, 66px);
+    margin-left: 12px;
+    padding: 0 10px;
+    border-radius: 18px;
+    background: linear-gradient(135deg, #ff8fb1, #ffc36b);
+    color: #fff;
+    font-family: 'Jua', 'Gaegu', sans-serif;
+    font-size: clamp(28px, 3.6vw, 46px);
+    line-height: 1;
+    text-shadow: 0 2px 4px rgba(0,0,0,.25);
+    box-shadow: 0 6px 16px rgba(255,130,170,.4);
+    vertical-align: middle;
+  }
+
+  /* 9단계 알파벳 폭죽: 글자들이 사방으로 터져나가는 오버레이 */
+  .alpha-overlay {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 60;
+    overflow: hidden;
+  }
+  .alpha-particle {
+    position: absolute;
+    font-family: 'Jua', 'Gaegu', sans-serif;
+    font-weight: 800;
+    font-size: clamp(26px, 3.4vw, 52px);
+    transform: translate(0, 0) rotate(0deg) scale(1);
+    opacity: 1;
+    transition: transform 1.5s cubic-bezier(.16, .7, .3, 1), opacity 1.5s ease-out;
+    text-shadow: 0 2px 6px rgba(0, 0, 0, .18);
+    will-change: transform, opacity;
+  }
+
+  /* 10단계 다음에 나올 구슬 맞추기: 패턴 시퀀스 + 보기 */
+  .pattern-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: clamp(6px, 1.4vw, 16px);
+    flex-wrap: nowrap;
+    max-width: 100%;
+  }
+  .pattern-choices {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: clamp(16px, 3.5vw, 42px);
+  }
+  .marble.pattern-cell {
+    --size: clamp(38px, 7.4vw, 70px);
+    animation: none; /* 시퀀스는 흔들리지 않게 고정 */
+    cursor: default;
+  }
+  .marble.pattern-unknown {
+    --hue: #d9d9e3;
+    color: #7d7d8c;
+    font-weight: 800;
+    font-size: calc(var(--size) * 0.5);
+  }
+  .marble.pattern-choice {
+    --size: clamp(56px, 11vw, 94px);
+  }
+  .marble.pattern-choice.pattern-picked {
+    outline: 4px solid #ffd166;
+    outline-offset: 3px;
+  }
+  .instruction .pattern-step {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 2px 12px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #ffd0e2, #ffe7c0);
+    color: #6b3b56;
+    font-size: clamp(13px, 1.4vw, 16px);
+    vertical-align: middle;
+  }
+
   .marble-grid {
     display: grid;
     gap: clamp(10px, 1.6vw, 22px);

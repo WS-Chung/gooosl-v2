@@ -11,7 +11,7 @@
 bead-v2/
 ├── index.html        # 페이지 뼈대 (link/script 태그만)
 ├── styles.css        # 전체 스타일 (약 20KB)
-├── data.js           # 8개 스테이지의 무작위 데이터 생성기 (data.py 의 JS 포팅)
+├── data.js           # 10개 스테이지의 무작위 데이터 생성기 (data.py 의 JS 포팅)
 ├── game.js           # 게임 로직: 렌더·드래그·사운드·애니메이션 (약 40KB)
 └── README.md
 ```

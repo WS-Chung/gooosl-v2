@@ -191,8 +191,8 @@
   function generateStage11() {
     const count = 24;
     const numColors = 6;
-    // 무지개 원색에서 6색을 뽑아 선명하게 (priority 헬퍼가 원색 우선 보장)
-    const chosen = pickPrioritizedColors(numColors); // [hex, name] tuple 6개
+    // 대비가 뚜렷한 빨·주·노·초·파·보 6색만 사용 (MISSION_COLORS = 정확히 이 6색)
+    const chosen = shuffle(Object.entries(MISSION_COLORS)); // [hex, name] tuple 6개
     // 6색 중 최다(6개)·최소(2개) 색을 서로 다르게 무작위 지정
     const order = shuffle(range(numColors));
     const mostColorIdx = order[0];
@@ -301,10 +301,10 @@
   }
 
   function generateStage8Memory() {
-    const pairs_count = 6;
+    const pairs_count = 8;      // 4×4 = 16개 = 8쌍
     const count = pairs_count * 2;
 
-    // 6쌍 → 모두 무지개 원색에서 추출 (7원색 중 6개를 임의 선택)
+    // 8쌍 → 무지개 7원색 + 보조 1색 = 8색을 각각 2번씩 배치
     const chosen = pickPrioritizedColors(pairs_count).map((p) => p[0]);
     const marbles = shuffle(chosen.concat(chosen));
 
@@ -360,18 +360,83 @@
     };
   }
 
+  // [9단계] 알파벳 맞추기 (대문자 ↔ 소문자 매칭, 2세부 단계)
+  // 세부1: 대문자 제시 → 소문자 12개 중 같은 알파벳 찾기
+  // 세부2: 소문자 제시 → 대문자 12개 중 같은 알파벳 찾기
+  // 색은 장식(글자로 식별)이라 무지개에서 반복 추출.
+  function generateStage12() {
+    const count = 12;
+    function makeSub(promptCase) {
+      const letterIdxs = sample(range(26), count); // 0=A … 25=Z, 12개 서로 다른 글자
+      const targetIdx = choice(letterIdxs);
+      const colors = [];
+      for (let i = 0; i < count; i++) colors.push(choice(RAINBOW_HEXES));
+      return {
+        promptCase: promptCase,     // "upper" | "lower" (제시되는 글자의 케이스)
+        targetIdx: targetIdx,       // 정답 알파벳 인덱스
+        letterIdxs: shuffle(letterIdxs),
+        colors: colors,
+      };
+    }
+    return {
+      id: 12,
+      title: "알파벳 맞추기",
+      instruction: "",
+      count: count,
+      subs: [makeSub("upper"), makeSub("lower")],
+      targets_total: 0, // 렌더러가 2세부 단계로 직접 관리
+    };
+  }
+
+  // [10단계] 다음에 나올 구슬 맞추기 (규칙성 있는 색 패턴 예측, 3서브 퀴즈)
+  // 각 퀴즈는 규칙적으로 반복되는 색 나열 뒤 '?'(무채색)를 두고, 보기 3개 중
+  // 다음에 올 색을 고른다. 서브1(주기2) → 서브2(주기3, AAB) → 서브3(주기3, ABC)
+  // 로 갈수록 어려워진다. 색은 대비가 뚜렷한 빨주노초파보 6색에서 매번 무작위.
+  function generateStage13() {
+    const palette = Object.keys(MISSION_COLORS); // 빨·주·노·초·파·보 hex 6개
+    function makeQuiz(patternUnit, numColors, shownCount) {
+      const cols = sample(palette, numColors); // 서로 다른 색
+      const sequence = [];
+      for (let i = 0; i < shownCount; i++) {
+        sequence.push(cols[patternUnit[i % patternUnit.length]]);
+      }
+      const answer_color = cols[patternUnit[shownCount % patternUnit.length]];
+      // 보기 3개: 정답 + 패턴에 등장한 색 우선, 부족하면 다른 색으로 채움
+      const choices = [];
+      const push = (c) => { if (choices.indexOf(c) < 0 && choices.length < 3) choices.push(c); };
+      push(answer_color);
+      cols.forEach(push);
+      shuffle(palette).forEach(push);
+      return { sequence: sequence, answer_color: answer_color, choices: shuffle(choices) };
+    }
+    return {
+      id: 13,
+      title: "다음에 나올 구슬은?",
+      instruction: "",
+      count: 6, // 커스텀 렌더 (setupGrid 안전값)
+      quizzes: [
+        makeQuiz([0, 1], 2, 5),    // 서브1: A B A B A ? → B (주기2, 쉬움)
+        makeQuiz([0, 0, 1], 2, 5), // 서브2: A A B A A ? → B (주기3, 보통)
+        makeQuiz([0, 1, 2], 3, 5), // 서브3: A B C A B ? → C (주기3, 어려움)
+      ],
+      targets_total: 0,
+    };
+  }
+
   function generateAllStages() {
     return {
       stages: [
-        // 총 8단계. 난이도 곡선: 시각 인지 → 색·수량 → 순차/공간 → 기억 → 한글 서열
+        // 총 10단계. 시각 인지 → 색·수량 → 순차/공간 → 기억 → 한글 → 알파벳 → 패턴 예측
         generateStage2(),         // 1단계: 반짝이는 구슬 (24개·3회, 시각 인지)
         generateStage3(),         // 2단계: 색상 매칭 (24개)
         generateStage11(),        // 3단계: 가장 많이/적게 있는 색 (수량 비교)
-        generateStage4(),         // 4단계: 1↔24 수 서열 (오름/내림)
+        generateStage4(),         // 4단계: 1↔12 수 서열 (오름/내림)
         generateStage6Position(), // 5단계: 색·방향 공간 인지 (24칸)
         generateStage9Simon(),    // 6단계: 따라 해봐! 순차 기억 (5개)
-        generateStage8Memory(),   // 7단계: 짝 찾기 (작업 기억)
-        generateStage10(),        // 8단계: 한글 기차 (마지막)
+        generateStage8Memory(),   // 7단계: 짝 찾기 (작업 기억, 4×4)
+        generateStage10(),        // 8단계: 한글 기차 (기차 이펙트)
+        generateStage12(),        // 9단계: 알파벳 맞추기 (알파벳 폭죽)
+        generateStage13(),        // 10단계: 다음에 나올 구슬 (패턴 예측, 마지막)
       ],
     };
   }

@@ -393,8 +393,8 @@
     clearGrid();
     setupGrid(stage.count, stage.cols);
     instructionEl.textContent = asc
-      ? "1부터 12까지 작은 수부터 차례대로 눌러보자!"
-      : "이번엔 12부터 1까지 큰 수부터 거꾸로 눌러보자!";
+      ? "1부터 12까지 작은 수부터 눌러보자!"
+      : "이번엔 12부터 1까지 거꾸로 눌러보자!";
 
     for (let i = 0; i < stage.count; i++) {
       const num = arr.numbers[i];
@@ -461,7 +461,7 @@
     subState.targetColor = isMost ? stage.most_color : stage.least_color;
     instructionEl.innerHTML = isMost
       ? "가장 <span class=\"accent\">많이</span> 있는 색깔을 찾아서 없애봐!"
-      : "이번엔 가장 <span class=\"accent\">조금</span> 있는 색깔을 찾아서 없애봐!";
+      : "이번엔 가장 <span class=\"accent\">조금</span> 있는 색깔을 없애봐!";
   }
 
   function onMostClick(m, stage, subState) {
@@ -713,7 +713,7 @@
     replay.id = "replay-btn";
     replay.type = "button";
     replay.className = "replay-btn";
-    replay.textContent = "다시 보여줘 🔁";
+    replay.textContent = "다시 보여줘";
     replay.addEventListener("click", () => {
       if (simonState.demoBusy) return;
       playSimonDemo(simonState);

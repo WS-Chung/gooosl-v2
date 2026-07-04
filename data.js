@@ -122,7 +122,7 @@
     return {
       id: 2,
       title: "반짝반짝 불이 켜진 구슬!",
-      instruction: "반짝이는 구슬을 모두 콕 눌러서 불을 꺼보자!",
+      instruction: "반짝이는 구슬을 콕 눌러서 불을 꺼보자!",
       count: count,
       rounds: rounds,
       lit_rounds: lit_rounds,
